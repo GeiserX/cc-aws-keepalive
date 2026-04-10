@@ -84,8 +84,10 @@ if (hasOmc) {
     isUpgrade = true;
     const hLines = hudContent.split("\n");
     const startIdx = hLines.findIndex(l => l.includes(MARKER));
-    const endIdx = hLines.findIndex(l => l.includes(MARKER_END));
-    if (startIdx !== -1 && endIdx !== -1) {
+    let endIdx = hLines.findIndex(l => l.includes(MARKER_END));
+    // Handle corrupted patch: if end marker missing, assume 2 lines after start (import + call)
+    if (endIdx === -1) endIdx = Math.min(startIdx + 2, hLines.length - 1);
+    if (startIdx !== -1) {
       let removeStart = startIdx;
       let removeEnd = endIdx;
       if (removeStart > 0 && hLines[removeStart - 1].trim() === "") removeStart--;
@@ -143,8 +145,12 @@ if (isPlugin && existsSync(settingsPath)) {
       ["awsAuthRefresh", "aws-auth-refresh.mjs"],
     ]) {
       const val = current[key];
-      if (typeof val === "string" && val.includes("cc-aws-keepalive") && !val.includes(scriptDir)) {
-        current[key] = `node ${scriptDir}/${script}`;
+      if (typeof val !== "string") continue;
+      // Replace only the versioned plugin path segment, preserving any wrapper commands/flags
+      const versionRe = /\/cc-aws-keepalive\/cc-aws-keepalive\/[^/]+/;
+      const newSegment = scriptDir.match(versionRe)?.[0];
+      if (newSegment && versionRe.test(val) && !val.includes(scriptDir)) {
+        current[key] = val.replace(versionRe, newSegment);
         updated = true;
       }
     }
