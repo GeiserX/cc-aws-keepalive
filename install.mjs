@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cross-platform installer for cc-aws-keepalive
-import { existsSync, mkdirSync, copyFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,22 +67,38 @@ if (isPlugin) {
   }, null, 2));
 }
 
-// 4. Status line (conditional)
+// 4. Status line timer
+const MARKER = "// [cc-aws-keepalive:timer-start]";
+
 if (hasOmc) {
-  console.log("\n\nOMC detected — keep your existing statusLine as-is.");
-  console.log("The UserPromptSubmit hook will warn you before expiry.");
-  console.log("\nTo also see a persistent timer, add to config.json:");
-  console.log(`  "statusLineCmd": "node ${omcHud}"`);
-  console.log("Then set statusLine to:");
-  console.log(JSON.stringify({
-    statusLine: {
-      type: "command",
-      command: `node ${scriptDir}/aws-statusline.mjs`,
-    },
-  }, null, 2));
-  console.log("\nNote: this replaces OMC's statusLine detection. If OMC shows");
-  console.log('"NOT configured" warnings, revert to OMC\'s statusLine and rely');
-  console.log("on the hook-based warnings instead.\n");
+  const hudContent = readFileSync(omcHud, "utf8");
+  if (hudContent.includes(MARKER)) {
+    console.log("\n\nOMC HUD already patched with AWS timer.");
+  } else {
+    // Find insertion point: after the last top-level import statement
+    const lines = hudContent.split("\n");
+    let insertIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trimStart().startsWith("import ")) {
+        insertIdx = i + 1;
+      }
+    }
+
+    const timerPath = join(scriptDir, "omc-timer.mjs");
+    const patch = [
+      "",
+      MARKER,
+      `import { patchStdout } from "${timerPath}";`,
+      "patchStdout();",
+      "// [cc-aws-keepalive:timer-end]",
+      "",
+    ].join("\n");
+
+    lines.splice(insertIdx, 0, patch);
+    writeFileSync(omcHud, lines.join("\n"));
+    console.log("\n\nOMC HUD patched — AWS timer shows inline (e.g., aws:5h23m).");
+    console.log("Note: if you update OMC, re-run this installer to re-apply the patch.");
+  }
 } else {
   console.log("\n\nOptional — show session timer in status bar:\n");
   console.log(JSON.stringify({
