@@ -41,9 +41,12 @@ fi
 
 WARN_SECONDS=$((WARN_MINUTES * 60))
 
+# Escape LOGIN_CMD for safe JSON embedding
+ESCAPED_CMD=$(printf '%s' "$LOGIN_CMD" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
 if [ "$REMAINING" -le 0 ]; then
-    # Expired — block the prompt
-    printf '{"decision":"block","reason":"AWS credentials EXPIRED. Run in another terminal:\\n  %s\\nThen come back and retry your message."}\n' "$LOGIN_CMD"
+    # Expired — block the prompt (reason must be valid JSON: use literal \n not newline chars)
+    printf '{"decision":"block","reason":"AWS credentials EXPIRED. Run in another terminal:  %s  — then come back and retry your message."}\n' "$ESCAPED_CMD"
     exit 0
 elif [ "$REMAINING" -le "$WARN_SECONDS" ]; then
     MINS=$((REMAINING / 60))
@@ -53,7 +56,9 @@ elif [ "$REMAINING" -le "$WARN_SECONDS" ]; then
     WARN_MARKER="/tmp/.cc-aws-keepalive-warned"
     if [ ! -f "$WARN_MARKER" ] || [ "$(cat "$WARN_MARKER" 2>/dev/null)" != "${EXPIRATION:-expired}" ]; then
         echo "${EXPIRATION:-expired}" > "$WARN_MARKER"
-        osascript -e "display notification \"Run: ${LOGIN_CMD}\" with title \"AWS Session\" subtitle \"Expires in ${MINS} minutes\"" 2>/dev/null || true
+        # Escape for AppleScript string
+        OSASCRIPT_CMD=$(printf '%s' "$LOGIN_CMD" | sed "s/'/'\\\\''/g")
+        osascript -e "display notification \"Run: ${OSASCRIPT_CMD}\" with title \"AWS Session\" subtitle \"Expires in ${MINS} minutes\"" 2>/dev/null || true
     fi
 fi
 

@@ -27,9 +27,10 @@ else
 fi
 
 echo ""
-echo "Add the following to your ~/.claude/settings.json:"
+echo "Add these keys to your ~/.claude/settings.json (merge into existing object):"
 echo ""
 cat <<EOF
+{
   "awsCredentialExport": "${INSTALL_DIR}/aws-cred-export.sh",
   "awsAuthRefresh": "${INSTALL_DIR}/aws-auth-refresh.sh",
   "hooks": {
@@ -44,7 +45,11 @@ cat <<EOF
         ]
       }
     ]
-  },
+  }
+}
 EOF
+echo ""
+echo "NOTE: Merge the keys above into your existing settings.json."
+echo "If you already have a \"hooks\" key, add the UserPromptSubmit entry to it."
 echo ""
 echo "Done."
