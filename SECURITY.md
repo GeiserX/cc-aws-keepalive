@@ -31,8 +31,10 @@ Only the latest version receives security updates.
 
 This project reads AWS credentials from `~/.aws/credentials` and outputs them as JSON for Claude Code's `awsCredentialExport` mechanism. The scripts:
 
-- **Never transmit credentials over the network** — all operations are local file reads
 - **Never log or cache credentials** — values are read and output in a single pass
+- **Credential export** (`aws-cred-export.mjs`) is a local file read — no network calls
+- **STS fallback**: when `expirationField` is not configured, `aws-auth-refresh.mjs` and `aws-cred-check.mjs` call `aws sts get-caller-identity` to verify credential validity. This makes a network call to AWS. Configure `expirationField` to avoid this
+- **Status line** (`aws-statusline.mjs`) executes `statusLineCmd` from config if set — only configure this with commands you trust
 - **Config file** (`~/.config/cc-aws-keepalive/config.json`) contains no secrets — only profile names and field references
 - **Hook output** is displayed inline in Claude Code — never contains credential values
 

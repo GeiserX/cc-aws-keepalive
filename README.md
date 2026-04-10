@@ -55,10 +55,19 @@ Requires Node.js (ships with Claude Code).
 # "enabledPlugins": { "cc-aws-keepalive@cc-aws-keepalive": true }
 ```
 
-The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `awsCredentialExport` and `awsAuthRefresh` manually — run the installer for the exact values:
+The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `awsCredentialExport` and `awsAuthRefresh` to `~/.claude/settings.json` — point them at the cached plugin path:
+
+```json
+{
+  "awsCredentialExport": "node ~/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/<version>/aws-cred-export.mjs",
+  "awsAuthRefresh": "node ~/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/<version>/aws-auth-refresh.mjs"
+}
+```
+
+Replace `<version>` with the installed version (e.g., `1.0.0`). Then create and edit your config:
 
 ```bash
-node install.mjs
+cp config.example.json ~/.config/cc-aws-keepalive/config.json
 ```
 
 ### Option B: Manual (no plugin system)

@@ -37,24 +37,37 @@ if (!existsSync(configFile)) {
   console.log(`Config exists: ${configFile} (not overwritten)\n`);
 }
 
-// 2. Core settings (always needed)
-console.log("=== Add to ~/.claude/settings.json ===\n");
-console.log("Core (credential refresh + proactive hook):\n");
-console.log(JSON.stringify({
-  awsCredentialExport: `node ${scriptDir}/aws-cred-export.mjs`,
-  awsAuthRefresh: `node ${scriptDir}/aws-auth-refresh.mjs`,
-  hooks: {
-    UserPromptSubmit: [{
-      matcher: "",
-      hooks: [{
-        type: "command",
-        command: `node ${scriptDir}/aws-cred-check.mjs`,
-      }],
-    }],
-  },
-}, null, 2));
+// 2. Detect plugin vs manual install
+const isPlugin = existsSync(join(__dirname, ".claude-plugin", "plugin.json"));
 
-// 3. Status line (conditional)
+// 3. Core settings (always needed)
+console.log("=== Add to ~/.claude/settings.json ===\n");
+
+if (isPlugin) {
+  console.log("Plugin detected — the UserPromptSubmit hook is auto-registered.");
+  console.log("You only need to add the credential settings:\n");
+  console.log(JSON.stringify({
+    awsCredentialExport: `node ${scriptDir}/aws-cred-export.mjs`,
+    awsAuthRefresh: `node ${scriptDir}/aws-auth-refresh.mjs`,
+  }, null, 2));
+} else {
+  console.log("Core (credential refresh + proactive hook):\n");
+  console.log(JSON.stringify({
+    awsCredentialExport: `node ${scriptDir}/aws-cred-export.mjs`,
+    awsAuthRefresh: `node ${scriptDir}/aws-auth-refresh.mjs`,
+    hooks: {
+      UserPromptSubmit: [{
+        matcher: "",
+        hooks: [{
+          type: "command",
+          command: `node ${scriptDir}/aws-cred-check.mjs`,
+        }],
+      }],
+    },
+  }, null, 2));
+}
+
+// 4. Status line (conditional)
 if (hasOmc) {
   console.log("\n\nOMC detected — keep your existing statusLine as-is.");
   console.log("The UserPromptSubmit hook will warn you before expiry.");
