@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Syntax check all scripts
+        run: |
+          for f in *.mjs; do
+            echo "Checking $f..."
+            node --check "$f"
+          done
+
+      - name: Validate JSON files
+        run: |
+          for f in config.example.json hooks/hooks.json .claude-plugin/plugin.json .claude-plugin/marketplace.json package.json; do
+            echo "Validating $f..."
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"
+          done
+
+      - name: Verify installer runs (manual mode)
+        run: |
+          export HOME=$(mktemp -d)
+          mkdir -p "$HOME/.aws"
+          printf '[default]\naws_access_key_id = test\n' > "$HOME/.aws/credentials"
+          node install.mjs 2>&1 | tee output.txt
+          grep -q "credential refresh + proactive hook" output.txt
