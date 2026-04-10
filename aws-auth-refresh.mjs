@@ -29,7 +29,11 @@ if (!info) {
 
 console.log("");
 console.log("AWS credentials expired.");
-console.log(`Run in another terminal:  ${config.loginCmd}`);
+if (config.loginCmd) {
+  console.log(`Run in another terminal:  ${config.loginCmd}`);
+} else {
+  console.log("Re-authenticate in another terminal.");
+}
 console.log(
   "Then come back here - CC will retry automatically on your next message."
 );

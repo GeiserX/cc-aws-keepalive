@@ -12,7 +12,7 @@ const CONFIG_PATH = join(
 const DEFAULTS = {
   profile: "default",
   expirationField: "",
-  loginCmd: "aws sso login --profile default",
+  loginCmd: "",
   warnMinutes: 30,
   timerWarnMinutes: 60,
   statusLineCmd: "",
