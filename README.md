@@ -41,13 +41,35 @@ Claude Code's AWS SDK caches credentials in memory and doesn't re-read `~/.aws/c
 
 Requires Node.js (ships with Claude Code).
 
+### Option A: As a Claude Code plugin (recommended)
+
+```bash
+# Add the marketplace to your settings.json:
+# "extraKnownMarketplaces": {
+#   "cc-aws-keepalive": {
+#     "source": { "source": "git", "url": "https://github.com/GeiserX/cc-aws-keepalive.git" }
+#   }
+# }
+#
+# Then enable the plugin:
+# "enabledPlugins": { "cc-aws-keepalive@cc-aws-keepalive": true }
+```
+
+The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `awsCredentialExport` and `awsAuthRefresh` manually — run the installer for the exact values:
+
+```bash
+node install.mjs
+```
+
+### Option B: Manual (no plugin system)
+
 ```bash
 git clone https://github.com/GeiserX/cc-aws-keepalive.git
 cd cc-aws-keepalive
 node install.mjs
 ```
 
-The installer creates a config and prints the settings to add to `~/.claude/settings.json`.
+The installer creates a config and prints all settings to add to `~/.claude/settings.json`.
 
 ### Configure
 
