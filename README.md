@@ -112,7 +112,9 @@ The optional `aws-statusline.mjs` shows a persistent countdown in the Claude Cod
 - Warning (< `timerWarnMinutes`): yellow `AWS: 45m`
 - Expired: red `AWS: EXPIRED`
 
-If you use another status line plugin (like [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode)), set `statusLineCmd` in config.json to your existing command — the timer will be appended. Note: some plugins validate the statusLine setting and may show warnings if replaced; in that case, skip the statusline feature and rely on the hook-based warnings.
+**[oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) users:** The installer auto-patches OMC's HUD to show the timer inline (e.g., `aws:5h23m`) without replacing your statusLine setting. Just run `node install.mjs` and it handles everything. Re-run after OMC updates to re-apply the patch.
+
+For other status line plugins, set `statusLineCmd` in config.json to your existing command — the timer will be appended.
 
 ## Credential providers
 
