@@ -1,6 +1,6 @@
 {
   "name": "cc-aws-keepalive",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keep Claude Code sessions alive through AWS credential expiration",
   "type": "module",
   "license": "GPL-3.0",

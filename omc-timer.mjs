@@ -27,10 +27,18 @@ export function patchStdout() {
   };
   process.on("exit", () => {
     process.stdout.write = origWrite;
-    const lines = chunks.join("").split("\n").filter(l => l.length > 0);
+    const raw = chunks.join("");
+    const lines = raw.split("\n");
+    // Remove trailing empty element from split (artifact of trailing \n)
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
     const timer = awsTimer();
-    if (lines.length > 0 && timer) lines[0] += " | " + timer;
-    else if (timer) lines.push(timer);
+    if (lines.length > 0 && timer) {
+      const idx = lines.findIndex(l => l.length > 0);
+      if (idx !== -1) lines[idx] += " | " + timer;
+      else lines.push(timer);
+    } else if (timer) {
+      lines.push(timer);
+    }
     if (lines.length > 0) origWrite(lines.join("\n") + "\n");
   });
 }

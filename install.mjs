@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Cross-platform installer for cc-aws-keepalive
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const home = homedir();
@@ -38,8 +38,11 @@ if (!existsSync(configFile)) {
 }
 
 // 2. Detect plugin vs manual install — true only when running from CC's plugin cache
+// Use realpathSync to handle macOS /var → /private/var symlink resolution
 const pluginCachePath = join(claudeConfigDir, "plugins", "cache");
-const isPlugin = scriptDir.startsWith(pluginCachePath);
+const isPlugin = existsSync(pluginCachePath)
+  ? realpathSync(scriptDir).startsWith(realpathSync(pluginCachePath))
+  : false;
 
 // 3. Core settings (always needed)
 console.log("=== Add to ~/.claude/settings.json ===\n");
@@ -70,36 +73,58 @@ if (isPlugin) {
 
 // 4. Status line timer
 const MARKER = "// [cc-aws-keepalive:timer-start]";
+const MARKER_END = "// [cc-aws-keepalive:timer-end]";
 
 if (hasOmc) {
-  const hudContent = readFileSync(omcHud, "utf8");
+  let hudContent = readFileSync(omcHud, "utf8");
+  let isUpgrade = false;
+
+  // Strip existing patch block if present (upgrade/repair)
   if (hudContent.includes(MARKER)) {
-    console.log("\n\nOMC HUD already patched with AWS timer.");
-  } else {
-    // Find insertion point: after the last top-level import statement
-    const lines = hudContent.split("\n");
-    let insertIdx = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trimStart().startsWith("import ")) {
-        insertIdx = i + 1;
-      }
+    isUpgrade = true;
+    const hLines = hudContent.split("\n");
+    const startIdx = hLines.findIndex(l => l.includes(MARKER));
+    let endIdx = hLines.findIndex(l => l.includes(MARKER_END));
+    // Handle corrupted patch: if end marker missing, assume 2 lines after start (import + call)
+    if (endIdx === -1) endIdx = Math.min(startIdx + 2, hLines.length - 1);
+    if (startIdx !== -1) {
+      let removeStart = startIdx;
+      let removeEnd = endIdx;
+      if (removeStart > 0 && hLines[removeStart - 1].trim() === "") removeStart--;
+      if (removeEnd < hLines.length - 1 && hLines[removeEnd + 1].trim() === "") removeEnd++;
+      hLines.splice(removeStart, removeEnd - removeStart + 1);
+      hudContent = hLines.join("\n");
     }
-
-    const timerPath = join(scriptDir, "omc-timer.mjs");
-    const patch = [
-      "",
-      MARKER,
-      `import { patchStdout } from "${timerPath}";`,
-      "patchStdout();",
-      "// [cc-aws-keepalive:timer-end]",
-      "",
-    ].join("\n");
-
-    lines.splice(insertIdx, 0, patch);
-    writeFileSync(omcHud, lines.join("\n"));
-    console.log("\n\nOMC HUD patched — AWS timer shows inline (e.g., aws:5h23m).");
-    console.log("Note: if you update OMC, re-run this installer to re-apply the patch.");
   }
+
+  // Insert fresh patch after the last import statement
+  const hLines = hudContent.split("\n");
+  let insertIdx = 0;
+  for (let i = 0; i < hLines.length; i++) {
+    if (hLines[i].trimStart().startsWith("import ")) {
+      insertIdx = i + 1;
+    }
+  }
+
+  const timerUrl = pathToFileURL(join(scriptDir, "omc-timer.mjs")).href;
+  const patch = [
+    "",
+    MARKER,
+    `import { patchStdout } from "${timerUrl}";`,
+    "patchStdout();",
+    MARKER_END,
+    "",
+  ].join("\n");
+
+  hLines.splice(insertIdx, 0, patch);
+  writeFileSync(omcHud, hLines.join("\n"));
+
+  if (isUpgrade) {
+    console.log("\n\nOMC HUD patch updated to current version.");
+  } else {
+    console.log("\n\nOMC HUD patched — AWS timer shows inline (e.g., aws:5h23m).");
+  }
+  console.log("Note: if you update OMC or this plugin, re-run the installer to re-apply.");
 } else {
   console.log("\n\nOptional — show session timer in status bar:\n");
   console.log(JSON.stringify({
@@ -108,6 +133,32 @@ if (hasOmc) {
       command: `node ${scriptDir}/aws-statusline.mjs`,
     },
   }, null, 2));
+}
+
+// 5. Auto-update settings.json credential paths on plugin version change
+if (isPlugin && existsSync(settingsPath)) {
+  try {
+    const current = JSON.parse(readFileSync(settingsPath, "utf8"));
+    let updated = false;
+    for (const [key, script] of [
+      ["awsCredentialExport", "aws-cred-export.mjs"],
+      ["awsAuthRefresh", "aws-auth-refresh.mjs"],
+    ]) {
+      const val = current[key];
+      if (typeof val !== "string") continue;
+      // Replace only the versioned plugin path segment, preserving any wrapper commands/flags
+      const versionRe = /\/cc-aws-keepalive\/cc-aws-keepalive\/[^/]+/;
+      const newSegment = scriptDir.match(versionRe)?.[0];
+      if (newSegment && versionRe.test(val) && !val.includes(scriptDir)) {
+        current[key] = val.replace(versionRe, newSegment);
+        updated = true;
+      }
+    }
+    if (updated) {
+      writeFileSync(settingsPath, JSON.stringify(current, null, 2) + "\n");
+      console.log("\nUpdated settings.json credential paths to current plugin version.");
+    }
+  } catch { /* settings.json parse failed — skip */ }
 }
 
 console.log("\nDone.");

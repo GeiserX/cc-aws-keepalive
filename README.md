@@ -80,6 +80,18 @@ node install.mjs
 
 The installer creates a config and prints all settings to add to `~/.claude/settings.json`.
 
+### Upgrading
+
+After upgrading, re-run the installer to update paths:
+
+- **Plugin**: `node ~/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/<version>/install.mjs`
+- **Manual**: `git pull && node install.mjs`
+
+The installer automatically:
+
+1. **OMC HUD patch**: Strips the old timer block and re-inserts with the current path
+2. **settings.json paths**: Updates `awsCredentialExport` and `awsAuthRefresh` to point to the new version directory (preserves any custom wrapper commands)
+
 ### Configure
 
 Edit `~/.config/cc-aws-keepalive/config.json`:

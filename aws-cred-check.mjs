@@ -24,10 +24,14 @@ if (info) {
 }
 
 if (remaining <= 0) {
-  const msg = `AWS credentials EXPIRED. Run in another terminal:  ${config.loginCmd}  — then come back and retry your message.`;
+  const action = config.loginCmd
+    ? `Run in another terminal:  ${config.loginCmd}  — then come back`
+    : "Re-authenticate in another terminal, then come back";
+  const msg = `AWS credentials EXPIRED. ${action} and retry your message.`;
   process.stdout.write(JSON.stringify({ decision: "block", reason: msg }) + "\n");
 } else if (remaining <= warnSeconds) {
+  const hint = config.loginCmd ? ` Run soon: ${config.loginCmd}` : " Re-authenticate soon.";
   process.stderr.write(
-    `AWS session expires in ${formatTime(remaining)}. Run soon: ${config.loginCmd}\n`
+    `AWS session expires in ${formatTime(remaining)}.${hint}\n`
   );
 }
