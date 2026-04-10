@@ -1,0 +1,18 @@
+# cc-aws-keepalive configuration
+# Copy to ~/.config/cc-aws-keepalive/config and edit
+
+# AWS profile name in ~/.aws/credentials
+PROFILE=default
+
+# Field name in ~/.aws/credentials that stores the session expiration as unix timestamp
+# Set to empty string if your credential tool doesn't write one (falls back to aws sts call)
+# Common values:
+#   awsmyid_session_expiration  (awsmyid)
+#   x_security_token_expires    (some SAML tools)
+EXPIRATION_FIELD=
+
+# Command to run for re-authentication (shown to user when creds expire)
+LOGIN_CMD="aws sso login --profile default"
+
+# Minutes before expiry to start warning
+WARN_MINUTES=30
