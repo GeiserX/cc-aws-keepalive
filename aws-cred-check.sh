@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook: proactive AWS credential expiry check.
-# Blocks prompt if expired, warns via stderr + macOS notification if nearing expiry.
+# Blocks prompt if expired, warns via stderr if nearing expiry.
 
 CONFIG_FILE="${HOME}/.config/cc-aws-keepalive/config"
 PROFILE="${CC_KEEPALIVE_PROFILE:-default}"
@@ -50,16 +50,8 @@ if [ "$REMAINING" -le 0 ]; then
     exit 0
 elif [ "$REMAINING" -le "$WARN_SECONDS" ]; then
     MINS=$((REMAINING / 60))
-    # Warn but don't block
+    # Warn but don't block — stderr is shown inline in CC
     echo "AWS session expires in ${MINS}m. Run soon: ${LOGIN_CMD}" >&2
-    # macOS notification (once per expiry cycle)
-    WARN_MARKER="/tmp/.cc-aws-keepalive-warned"
-    if [ ! -f "$WARN_MARKER" ] || [ "$(cat "$WARN_MARKER" 2>/dev/null)" != "${EXPIRATION:-expired}" ]; then
-        echo "${EXPIRATION:-expired}" > "$WARN_MARKER"
-        # Escape for AppleScript string
-        OSASCRIPT_CMD=$(printf '%s' "$LOGIN_CMD" | sed "s/'/'\\\\''/g")
-        osascript -e "display notification \"Run: ${OSASCRIPT_CMD}\" with title \"AWS Session\" subtitle \"Expires in ${MINS} minutes\"" 2>/dev/null || true
-    fi
 fi
 
 exit 0
