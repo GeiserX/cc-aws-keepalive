@@ -57,12 +57,12 @@ PROFILE=my-bedrock-profile
 # Field in ~/.aws/credentials that stores session expiration as unix timestamp.
 # Leave empty to fall back to `aws sts get-caller-identity` (slower but universal).
 # Common values:
-#   awsmyid_session_expiration   (awsmyid)
 #   x_security_token_expires     (some SAML tools)
-EXPIRATION_FIELD=awsmyid_session_expiration
+#   Check your ~/.aws/credentials after login to find the right field name.
+EXPIRATION_FIELD=
 
 # Command shown to user when creds expire (your SSO/SAML login command)
-LOGIN_CMD="awsmyid login -p my-bedrock-profile"
+LOGIN_CMD="saml2aws login --profile my-bedrock-profile"
 
 # Minutes before expiry to start warning
 WARN_MINUTES=30
@@ -94,17 +94,17 @@ Add these keys to your `~/.claude/settings.json`:
 
 ## Credential providers
 
-Works with any tool that writes temporary credentials to `~/.aws/credentials`:
+Works with any tool that **materializes temporary credentials** (`aws_access_key_id`, `aws_secret_access_key`, `aws_session_token`) into `~/.aws/credentials`:
 
-- **AWS SSO** (`aws sso login`)
-- **awsmyid** (Disney MyID SAML)
 - **saml2aws**
+- **gimme-aws-creds** (Okta)
 - **aws-google-auth**
 - **onelogin-aws-cli**
-- **gimme-aws-creds** (Okta)
-- Any custom SAML/OIDC tool
+- Any corporate SAML/OIDC CLI tool that writes to `~/.aws/credentials`
 
-If your tool doesn't write an expiration timestamp field, leave `EXPIRATION_FIELD` empty. The scripts will fall back to testing credentials via `aws sts get-caller-identity` (adds ~1s latency per prompt).
+> **Note:** Plain `aws sso login` stores tokens in `~/.aws/sso/cache/`, not in `~/.aws/credentials`. If you use AWS SSO, you need a wrapper that exports the session to the credentials file (e.g., `aws configure export-credentials --profile myprofile --format process`), or use a tool like `saml2aws` / `gimme-aws-creds` that writes directly to the credentials file.
+
+If your tool doesn't write an expiration timestamp field, leave `EXPIRATION_FIELD` empty. The scripts will fall back to testing credentials via `aws sts get-caller-identity` (adds ~1s latency per prompt, and proactive warnings are not available — only expired/valid detection).
 
 ## Requirements
 
@@ -112,9 +112,15 @@ If your tool doesn't write an expiration timestamp field, leave `EXPIRATION_FIEL
 - Any AWS credential provider that writes to `~/.aws/credentials`
 - macOS for desktop notifications (optional, gracefully skipped on Linux)
 
-## How is this different from just running `aws sso login`?
+## How is this different from just re-authenticating?
 
 The problem isn't re-authenticating — it's that **Claude Code sessions don't pick up new credentials** after you re-authenticate. Even after refreshing `~/.aws/credentials`, existing CC sessions keep using stale cached credentials from memory. This project fixes that by making CC re-read from disk via `awsCredentialExport`.
+
+## Limitations
+
+- **Proactive warnings** (time-remaining) require `EXPIRATION_FIELD` to be set. Without it, the STS fallback can only detect valid/expired, not "expires in 20 minutes".
+- **macOS notifications** use `osascript`. On Linux they are silently skipped (stderr warnings still work).
+- This does **not** automate re-authentication. You still need to run your login command manually — but you no longer need to restart Claude Code after doing so.
 
 ## License
 
