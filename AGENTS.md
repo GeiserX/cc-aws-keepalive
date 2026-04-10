@@ -21,7 +21,7 @@ The `hooks/hooks.json` auto-registers the `UserPromptSubmit` hook when installed
 
 ## Cross-Platform
 
-All scripts are Node.js (`.mjs`). No bash, no platform-specific code. Uses `node:fs`, `node:os`, `node:path` only. The `osascript` call was removed — warnings go to stderr.
+All scripts are Node.js (`.mjs`). No bash, no platform-specific code. Uses `node:fs`, `node:os`, `node:path`, and `node:child_process` (`execFileSync` for STS fallback and status line composition). The `osascript` call was removed — warnings go to stderr.
 
 ## Testing
 
