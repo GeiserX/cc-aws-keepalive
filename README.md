@@ -64,7 +64,7 @@ The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `aw
 }
 ```
 
-Replace `<version>` with the installed version (e.g., `1.0.0`). Then create and edit your config:
+Replace `<version>` with the installed version (e.g., `0.1.0`). Then create and edit your config:
 
 ```bash
 cp config.example.json ~/.config/cc-aws-keepalive/config.json
@@ -112,7 +112,7 @@ The optional `aws-statusline.mjs` shows a persistent countdown in the Claude Cod
 - Warning (< `timerWarnMinutes`): yellow `AWS: 45m`
 - Expired: red `AWS: EXPIRED`
 
-**[oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) users:** The installer auto-patches OMC's HUD to show the timer inline (e.g., `aws:5h23m`) without replacing your statusLine setting. Just run `node install.mjs` and it handles everything. Re-run after OMC updates to re-apply the patch.
+**[oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) users:** The installer can optionally patch OMC's HUD script to show the timer inline (e.g., `aws:5h23m`) without replacing your statusLine setting. It inserts a 3-line import block after the existing imports in `omc-hud.mjs`. Re-run after OMC updates to re-apply. The patch is marker-based and idempotent, but no backup is created — review the change if you prefer to apply it manually.
 
 For other status line plugins, set `statusLineCmd` in config.json to your existing command — the timer will be appended.
 

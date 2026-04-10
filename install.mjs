@@ -37,8 +37,9 @@ if (!existsSync(configFile)) {
   console.log(`Config exists: ${configFile} (not overwritten)\n`);
 }
 
-// 2. Detect plugin vs manual install
-const isPlugin = existsSync(join(__dirname, ".claude-plugin", "plugin.json"));
+// 2. Detect plugin vs manual install — true only when running from CC's plugin cache
+const pluginCachePath = join(claudeConfigDir, "plugins", "cache");
+const isPlugin = scriptDir.startsWith(pluginCachePath);
 
 // 3. Core settings (always needed)
 console.log("=== Add to ~/.claude/settings.json ===\n");
