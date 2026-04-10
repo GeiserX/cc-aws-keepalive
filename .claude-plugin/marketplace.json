@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cc-aws-keepalive",
+  "description": "Keep Claude Code sessions alive through AWS credential expiration",
+  "owner": {
+    "name": "GeiserX",
+    "email": "9169332+GeiserX@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "cc-aws-keepalive",
+      "description": "Proactive AWS credential expiry detection, session-surviving credential refresh, and optional statusline timer for Claude Code on Bedrock",
+      "version": "1.0.0",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/GeiserX/cc-aws-keepalive",
+      "tags": ["aws", "bedrock", "credentials", "sso", "saml", "keepalive"]
+    }
+  ],
+  "version": "1.0.0"
+}
