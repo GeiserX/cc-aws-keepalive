@@ -80,6 +80,15 @@ node install.mjs
 
 The installer creates a config and prints all settings to add to `~/.claude/settings.json`.
 
+### Upgrading
+
+When the plugin updates to a new version, re-run the installer. It automatically:
+
+1. **OMC HUD patch**: Strips the old timer block and re-inserts with the current path
+2. **settings.json paths**: Updates `awsCredentialExport` and `awsAuthRefresh` to point to the new version directory
+
+For plugin installs, restart Claude Code — the new version's installer runs automatically. For manual installs, `git pull && node install.mjs`.
+
 ### Configure
 
 Edit `~/.config/cc-aws-keepalive/config.json`:
