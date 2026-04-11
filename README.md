@@ -101,6 +101,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
   "profile": "my-bedrock-profile",
   "expirationField": "x_security_token_expires",
   "loginCmd": "saml2aws login --profile my-bedrock-profile",
+  "autoLoginMinutes": 120,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
   "statusLineCmd": ""
@@ -111,7 +112,8 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 |-------|-------------|
 | `profile` | AWS profile name in `~/.aws/credentials` |
 | `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower) |
-| `loginCmd` | Command shown to you when credentials expire |
+| `loginCmd` | Command to re-authenticate (shown in warnings, used by auto-login) |
+| `autoLoginMinutes` | Auto-run `loginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
 | `warnMinutes` | Minutes before expiry to start warning in the hook |
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |
 | `statusLineCmd` | Existing status line command to compose with (leave empty for standalone) |

@@ -2,6 +2,7 @@
   "profile": "default",
   "expirationField": "",
   "loginCmd": "saml2aws login --profile default",
+  "autoLoginMinutes": 0,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
   "statusLineCmd": ""
