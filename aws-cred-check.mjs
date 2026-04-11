@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // UserPromptSubmit hook: proactive AWS credential expiry check.
-// Blocks prompt if expired, warns via stderr if nearing expiry.
+// Warns via stderr if expired or nearing expiry (never blocks — blocked prompts are discarded by CC).
 import { execFileSync } from "node:child_process";
 import { loadConfig, getRemaining, formatTime } from "./lib.mjs";
 
@@ -25,10 +25,11 @@ if (info) {
 
 if (remaining <= 0) {
   const action = config.loginCmd
-    ? `Run in another terminal:  ${config.loginCmd}  — then come back`
-    : "Re-authenticate in another terminal, then come back";
-  const msg = `AWS credentials EXPIRED. ${action} and retry your message.`;
-  process.stdout.write(JSON.stringify({ decision: "block", reason: msg }) + "\n");
+    ? `Run: ${config.loginCmd}`
+    : "Re-authenticate";
+  process.stderr.write(
+    `⚠ AWS credentials EXPIRED. ${action} in another terminal — CC will auto-retry via awsAuthRefresh.\n`
+  );
 } else if (remaining <= warnSeconds) {
   const hint = config.loginCmd ? ` Run soon: ${config.loginCmd}` : " Re-authenticate soon.";
   process.stderr.write(
