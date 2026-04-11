@@ -7,7 +7,7 @@ Claude Code plugin that keeps Bedrock sessions alive through AWS credential expi
 - **`lib.mjs`** — Shared config loader and credential parser. All scripts import from here.
 - **`aws-cred-export.mjs`** — Reads fresh creds from `~/.aws/credentials`, bypassing SDK in-memory cache. Used by CC's `awsCredentialExport`.
 - **`aws-auth-refresh.mjs`** — Checks if creds were already refreshed in another terminal. Used by CC's `awsAuthRefresh`.
-- **`aws-cred-check.mjs`** — `UserPromptSubmit` hook. Blocks if expired, warns if nearing expiry.
+- **`aws-cred-check.mjs`** — `UserPromptSubmit` hook. Warns via stderr if expired or nearing expiry (never blocks — blocked prompts are discarded by CC).
 - **`aws-statusline.mjs`** — Optional statusline timer with ANSI color.
 - **`install.mjs`** — Cross-platform installer. Detects OMC and other plugins.
 
