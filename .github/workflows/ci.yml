@@ -79,6 +79,7 @@ jobs:
           node install.mjs 2>&1 | tee output.txt
           grep -q "Removed legacy patch" output.txt
           # Legacy markers must be gone from omc-hud.mjs
+          test -f "$HOME/.claude/hud/omc-hud.mjs"
           ! grep -q "cc-aws-keepalive:timer-start" "$HOME/.claude/hud/omc-hud.mjs"
           ! grep -q "/old/path" "$HOME/.claude/hud/omc-hud.mjs"
           # Wrapper must exist
