@@ -73,19 +73,14 @@ if (isPlugin) {
 
 // 4. Status line timer
 const MARKER = "// [cc-aws-keepalive:timer-start]";
-const MARKER_END = "// [cc-aws-keepalive:timer-end]";
 
 if (hasOmc) {
-  let hudContent = readFileSync(omcHud, "utf8");
-  let isUpgrade = false;
-
-  // Strip existing patch block if present (upgrade/repair)
+  // Clean up legacy patch from omc-hud.mjs if present (old installer versions patched it directly)
+  const hudContent = readFileSync(omcHud, "utf8");
   if (hudContent.includes(MARKER)) {
-    isUpgrade = true;
     const hLines = hudContent.split("\n");
     const startIdx = hLines.findIndex(l => l.includes(MARKER));
-    let endIdx = hLines.findIndex(l => l.includes(MARKER_END));
-    // Handle corrupted patch: if end marker missing, assume 2 lines after start (import + call)
+    let endIdx = hLines.findIndex(l => l.includes("// [cc-aws-keepalive:timer-end]"));
     if (endIdx === -1) endIdx = Math.min(startIdx + 2, hLines.length - 1);
     if (startIdx !== -1) {
       let removeStart = startIdx;
@@ -93,38 +88,52 @@ if (hasOmc) {
       if (removeStart > 0 && hLines[removeStart - 1].trim() === "") removeStart--;
       if (removeEnd < hLines.length - 1 && hLines[removeEnd + 1].trim() === "") removeEnd++;
       hLines.splice(removeStart, removeEnd - removeStart + 1);
-      hudContent = hLines.join("\n");
+      writeFileSync(omcHud, hLines.join("\n"));
+      console.log("\n\nRemoved legacy patch from omc-hud.mjs.");
     }
   }
 
-  // Insert fresh patch after the last import statement
-  const hLines = hudContent.split("\n");
-  let insertIdx = 0;
-  for (let i = 0; i < hLines.length; i++) {
-    if (hLines[i].trimStart().startsWith("import ")) {
-      insertIdx = i + 1;
-    }
-  }
-
+  // Create wrapper script that survives OMC updates (lives outside omc-hud.mjs)
+  const wrapperPath = join(dirname(omcHud), "aws-hud-wrapper.mjs");
   const timerUrl = pathToFileURL(join(scriptDir, "omc-timer.mjs")).href;
-  const patch = [
-    "",
-    MARKER,
-    `import { patchStdout } from "${timerUrl}";`,
-    "patchStdout();",
-    MARKER_END,
-    "",
+  const wrapper = [
+    '#!/usr/bin/env node',
+    '// AWS timer wrapper: intercepts OMC HUD stdout, appends AWS session timer.',
+    '// Created by cc-aws-keepalive. OMC-update-safe (lives outside omc-hud.mjs).',
+    'import { pathToFileURL } from "node:url";',
+    'import { join } from "node:path";',
+    'import { homedir } from "node:os";',
+    '',
+    'try {',
+    `  const { patchStdout } = await import("${timerUrl}");`,
+    '  patchStdout();',
+    '} catch { /* cc-aws-keepalive not available — continue without timer */ }',
+    '',
+    'const configDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");',
+    'await import(pathToFileURL(join(configDir, "hud", "omc-hud.mjs")).href);',
+    '',
   ].join("\n");
+  writeFileSync(wrapperPath, wrapper);
 
-  hLines.splice(insertIdx, 0, patch);
-  writeFileSync(omcHud, hLines.join("\n"));
-
-  if (isUpgrade) {
-    console.log("\n\nOMC HUD patch updated to current version.");
-  } else {
-    console.log("\n\nOMC HUD patched — AWS timer shows inline (e.g., aws:5h23m).");
+  // Update statusLine in settings.json to use the wrapper
+  if (existsSync(settingsPath)) {
+    try {
+      const current = JSON.parse(readFileSync(settingsPath, "utf8"));
+      const sl = current.statusLine;
+      if (sl && typeof sl.command === "string" && sl.command.includes("omc-hud.mjs") && !sl.command.includes("aws-hud-wrapper.mjs")) {
+        current.statusLine.command = sl.command.replace("omc-hud.mjs", "aws-hud-wrapper.mjs");
+        writeFileSync(settingsPath, JSON.stringify(current, null, 2) + "\n");
+        console.log("\n\nOMC HUD wrapper installed — AWS timer shows inline (e.g., aws:5h23m).");
+        console.log("Survives OMC updates (no patching of omc-hud.mjs).");
+      } else {
+        console.log("\n\nOMC HUD wrapper created at: " + wrapperPath);
+        console.log("Update your statusLine command to use aws-hud-wrapper.mjs instead of omc-hud.mjs.");
+      }
+    } catch {
+      console.log("\n\nOMC HUD wrapper created at: " + wrapperPath);
+      console.log("Update your statusLine command to use aws-hud-wrapper.mjs instead of omc-hud.mjs.");
+    }
   }
-  console.log("Note: if you update OMC or this plugin, re-run the installer to re-apply.");
 } else {
   console.log("\n\nOptional — show session timer in status bar:\n");
   console.log(JSON.stringify({
