@@ -39,69 +39,78 @@ jobs:
           node install.mjs 2>&1 | tee output.txt
           grep -q "credential refresh + proactive hook" output.txt
 
-      - name: Verify OMC patch and upgrade repair
+      - name: Verify OMC wrapper install and idempotency
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws" "$HOME/.claude/hud"
           printf '[default]\naws_access_key_id = test\n' > "$HOME/.aws/credentials"
-          # Create minimal omc-hud.mjs
           printf 'import { existsSync } from "node:fs";\nasync function main() {}\nmain();\n' > "$HOME/.claude/hud/omc-hud.mjs"
-          # Fresh patch
+          node -e "
+            const fs = require('fs');
+            fs.writeFileSync('$HOME/.claude/settings.json', JSON.stringify({
+              statusLine: { type: 'command', command: 'node omc-hud.mjs' }
+            }, null, 2));
+          "
+          # Fresh install — creates wrapper, updates statusLine
           node install.mjs 2>&1 | tee output.txt
-          grep -q "OMC HUD patched" output.txt
-          grep -q "cc-aws-keepalive:timer-start" "$HOME/.claude/hud/omc-hud.mjs"
-          grep -q "file://" "$HOME/.claude/hud/omc-hud.mjs"
-          # Upgrade repair — re-running replaces old patch with current path
+          grep -q "OMC HUD wrapper installed" output.txt
+          test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
+          grep -q "file://" "$HOME/.claude/hud/aws-hud-wrapper.mjs"
+          grep -q "aws-hud-wrapper.mjs" "$HOME/.claude/settings.json"
+          # omc-hud.mjs must NOT be modified
+          diff <(printf 'import { existsSync } from "node:fs";\nasync function main() {}\nmain();\n') "$HOME/.claude/hud/omc-hud.mjs"
+          # Re-run — idempotent, wrapper updated
           node install.mjs 2>&1 | tee output2.txt
-          grep -q "OMC HUD patch updated" output2.txt
-          grep -q "cc-aws-keepalive:timer-start" "$HOME/.claude/hud/omc-hud.mjs"
+          test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
-      - name: Verify corrupted OMC patch repair
+      - name: Verify legacy patch cleanup
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws" "$HOME/.claude/hud"
           printf '[default]\naws_access_key_id = test\n' > "$HOME/.aws/credentials"
-          # Create omc-hud.mjs with start marker but NO end marker (corrupted)
-          printf 'import { existsSync } from "node:fs";\n// [cc-aws-keepalive:timer-start]\nimport { patchStdout } from "/old/path/omc-timer.mjs";\npatchStdout();\nasync function main() {}\nmain();\n' > "$HOME/.claude/hud/omc-hud.mjs"
+          node -e "
+            const fs = require('fs');
+            fs.writeFileSync('$HOME/.claude/settings.json', JSON.stringify({
+              statusLine: { type: 'command', command: 'node omc-hud.mjs' }
+            }, null, 2));
+          "
+          # Create omc-hud.mjs with legacy marker patch
+          printf 'import { existsSync } from "node:fs";\n\n// [cc-aws-keepalive:timer-start]\nimport { patchStdout } from "/old/path/omc-timer.mjs";\npatchStdout();\n// [cc-aws-keepalive:timer-end]\n\nasync function main() {}\nmain();\n' > "$HOME/.claude/hud/omc-hud.mjs"
           node install.mjs 2>&1 | tee output.txt
-          grep -q "OMC HUD patch updated" output.txt
-          # Verify no duplicates: exactly 1 patchStdout() call, both markers present
-          test "$(grep -c '^patchStdout();' "$HOME/.claude/hud/omc-hud.mjs")" -eq 1
-          test "$(grep -c 'cc-aws-keepalive:timer' "$HOME/.claude/hud/omc-hud.mjs")" -eq 2
-          # Old path is gone
+          grep -q "Removed legacy patch" output.txt
+          # Legacy markers must be gone from omc-hud.mjs
+          test -f "$HOME/.claude/hud/omc-hud.mjs"
+          ! grep -q "cc-aws-keepalive:timer-start" "$HOME/.claude/hud/omc-hud.mjs"
           ! grep -q "/old/path" "$HOME/.claude/hud/omc-hud.mjs"
+          # Wrapper must exist
+          test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify plugin mode and settings update
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws"
           printf '[default]\naws_access_key_id = test\n' > "$HOME/.aws/credentials"
-          # Simulate plugin cache structure
-          PLUGIN_DIR="$HOME/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/0.1.1"
+          PLUGIN_DIR="$HOME/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/0.2.1"
           mkdir -p "$PLUGIN_DIR/hooks" "$PLUGIN_DIR/.claude-plugin"
           cp *.mjs "$PLUGIN_DIR/"
           cp config.example.json "$PLUGIN_DIR/"
           cp -r hooks/* "$PLUGIN_DIR/hooks/" 2>/dev/null || true
           cp -r .claude-plugin/* "$PLUGIN_DIR/.claude-plugin/" 2>/dev/null || true
-          # Create stale settings.json pointing to old version
           OLD_DIR="$HOME/.claude/plugins/cache/cc-aws-keepalive/cc-aws-keepalive/0.0.0"
           node -e "
             const fs = require('fs');
-            const s = {
+            fs.mkdirSync('$HOME/.claude', { recursive: true });
+            fs.writeFileSync('$HOME/.claude/settings.json', JSON.stringify({
               awsCredentialExport: 'node $OLD_DIR/aws-cred-export.mjs',
               awsAuthRefresh: 'node $OLD_DIR/aws-auth-refresh.mjs'
-            };
-            fs.mkdirSync('$HOME/.claude', { recursive: true });
-            fs.writeFileSync('$HOME/.claude/settings.json', JSON.stringify(s, null, 2));
+            }, null, 2));
           "
-          # Run from plugin dir
           cd "$PLUGIN_DIR"
           node install.mjs 2>&1 | tee output.txt
           grep -q "Plugin detected" output.txt
           grep -q "Updated settings.json" output.txt
-          # Verify paths now point to current version
           node -e "
             const s = JSON.parse(require('fs').readFileSync('$HOME/.claude/settings.json', 'utf8'));
-            if (!s.awsCredentialExport.includes('0.1.1')) process.exit(1);
-            if (!s.awsAuthRefresh.includes('0.1.1')) process.exit(1);
+            if (!s.awsCredentialExport.includes('0.2.1')) process.exit(1);
+            if (!s.awsAuthRefresh.includes('0.2.1')) process.exit(1);
           "
