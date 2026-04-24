@@ -1,1 +1,7 @@
 .omc/
+node_modules/
+config.json
+.env
+.env.*
+*.log
+.DS_Store

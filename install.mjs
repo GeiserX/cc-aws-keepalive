@@ -78,7 +78,7 @@ if (hasOmc) {
   // Clean up legacy patch from omc-hud.mjs if present (old installer versions patched it directly)
   const hudContent = readFileSync(omcHud, "utf8");
   if (hudContent.includes(MARKER)) {
-    const hLines = hudContent.split("\n");
+    const hLines = hudContent.split(/\r?\n/);
     const startIdx = hLines.findIndex(l => l.includes(MARKER));
     let endIdx = hLines.findIndex(l => l.includes("// [cc-aws-keepalive:timer-end]"));
     if (endIdx === -1) endIdx = Math.min(startIdx + 2, hLines.length - 1);
@@ -156,7 +156,7 @@ if (isPlugin && existsSync(settingsPath)) {
       const val = current[key];
       if (typeof val !== "string") continue;
       // Replace only the versioned plugin path segment, preserving any wrapper commands/flags
-      const versionRe = /\/cc-aws-keepalive\/cc-aws-keepalive\/[^/]+/;
+      const versionRe = /[/\\]cc-aws-keepalive[/\\]cc-aws-keepalive[/\\][^/\\]+/;
       const newSegment = scriptDir.match(versionRe)?.[0];
       if (newSegment && versionRe.test(val) && !val.includes(scriptDir)) {
         current[key] = val.replace(versionRe, newSegment);

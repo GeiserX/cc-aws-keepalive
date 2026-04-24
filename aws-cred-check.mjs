@@ -2,8 +2,7 @@
 // UserPromptSubmit hook: proactive AWS credential expiry check.
 // Warns via stderr if expired or nearing expiry (never blocks — blocked prompts are discarded by CC).
 // Optionally auto-renews credentials when within autoLoginMinutes window.
-import { execSync } from "node:child_process";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +21,7 @@ if (info) {
   try {
     execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
       stdio: "ignore",
+      timeout: 10_000,
     });
     process.exit(0); // Valid, can't determine remaining time
   } catch {
@@ -29,8 +29,10 @@ if (info) {
   }
 }
 
-// Auto-login: silently re-authenticate when within the configured window
-if (autoLoginSeconds > 0 && config.loginCmd && remaining > 0 && remaining <= autoLoginSeconds) {
+// Auto-login: re-authenticate when within the configured window
+// Only use autoLoginCmd (designed for non-interactive use), never loginCmd (may need a TTY)
+const autoCmd = config.autoLoginCmd;
+if (autoLoginSeconds > 0 && autoCmd && remaining > 0 && remaining <= autoLoginSeconds) {
   const stateDir = join(homedir(), ".config", "cc-aws-keepalive");
   const lockFile = join(stateDir, ".last-auto-login");
   const cooldownSec = 300; // Don't retry more than once per 5 minutes
@@ -44,18 +46,20 @@ if (autoLoginSeconds > 0 && config.loginCmd && remaining > 0 && remaining <= aut
   }
 
   if (shouldRun) {
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(lockFile, String(Math.floor(Date.now() / 1000)));
     try {
-      execSync(config.loginCmd, { stdio: "ignore", timeout: 30_000 });
-      // Re-check credentials after login
-      const refreshed = getRemaining(config);
-      if (refreshed && refreshed.remaining > autoLoginSeconds) {
-        process.stderr.write(
-          `AWS session auto-renewed (valid for ${formatTime(refreshed.remaining)}).\n`
-        );
-        process.exit(0);
-      }
+      mkdirSync(stateDir, { recursive: true });
+      // Spawn detached so it doesn't block the prompt (may need MFA push)
+      const child = spawn(autoCmd, {
+        shell: true,
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      // Write lockfile after successful spawn (not before)
+      writeFileSync(lockFile, String(Math.floor(Date.now() / 1000)));
+      process.stderr.write(
+        `AWS auto-login started in background (${formatTime(remaining)} remaining).\n`
+      );
     } catch {
       process.stderr.write(
         `Auto-login failed. Run manually: ${config.loginCmd}\n`

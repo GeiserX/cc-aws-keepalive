@@ -34,8 +34,9 @@ Four Node.js scripts (cross-platform: macOS, Linux, Windows) that hook into Clau
 
 1. Claude Code hits a Bedrock 403
 2. `awsAuthRefresh` runs — checks if you already re-authed in another terminal
-3. `awsCredentialExport` reads fresh creds from disk (bypassing SDK memory cache)
-4. Claude Code retries the API call — session continues without restart
+3. If still expired and `autoLoginCmd` is configured, runs it synchronously (waits up to 3 minutes for password + MFA)
+4. `awsCredentialExport` reads fresh creds from disk (bypassing SDK memory cache)
+5. Claude Code retries the API call — session continues without restart
 
 ### The key insight
 
@@ -68,7 +69,7 @@ The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `aw
 }
 ```
 
-Replace `<version>` with the installed version (e.g., `0.1.0`). Then create and edit your config:
+Replace `<version>` with the installed version (e.g., `0.3.0`). Then create and edit your config:
 
 ```bash
 cp config.example.json ~/.config/cc-aws-keepalive/config.json
@@ -93,7 +94,7 @@ After upgrading, re-run the installer to update paths:
 
 The installer automatically:
 
-1. **OMC HUD patch**: Strips the old timer block and re-inserts with the current path
+1. **OMC HUD wrapper**: Cleans up any legacy timer patch from `omc-hud.mjs` and updates the `aws-hud-wrapper.mjs` with the current path
 2. **settings.json paths**: Updates `awsCredentialExport` and `awsAuthRefresh` to point to the new version directory (preserves any custom wrapper commands)
 
 ### Configure
@@ -105,6 +106,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
   "profile": "my-bedrock-profile",
   "expirationField": "x_security_token_expires",
   "loginCmd": "saml2aws login --profile my-bedrock-profile",
+  "autoLoginCmd": "",
   "autoLoginMinutes": 120,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
@@ -116,11 +118,29 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 |-------|-------------|
 | `profile` | AWS profile name in `~/.aws/credentials` |
 | `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower) |
-| `loginCmd` | Command to re-authenticate (shown in warnings, used by auto-login) |
-| `autoLoginMinutes` | Auto-run `loginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
+| `loginCmd` | Command to re-authenticate (shown in warnings) |
+| `autoLoginCmd` | Command for automated non-interactive re-authentication (e.g., an `expect` script). Must handle password/MFA without a TTY. |
+| `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
 | `warnMinutes` | Minutes before expiry to start warning in the hook |
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |
 | `statusLineCmd` | Existing status line command to compose with (leave empty for standalone) |
+
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `CC_KEEPALIVE_PROFILE` | Overrides `profile` from config. Useful for multi-account setups where different terminals use different AWS accounts. |
+
+**Common `expirationField` values by provider:**
+
+| Provider | `expirationField` value |
+|----------|------------------------|
+| saml2aws | `x_security_token_expires` |
+| gimme-aws-creds | `x_security_token_expires` |
+| awsmyid | `awsmyid_session_expiration` |
+| aws-google-auth | `x_security_token_expires` |
+
+Check your `~/.aws/credentials` after authenticating to find the field name for your provider.
 
 ### Status line timer
 
@@ -152,10 +172,14 @@ Works with any tool that **materializes temporary credentials** (`aws_access_key
 - Node.js (ships with Claude Code)
 - Any AWS credential provider that writes to `~/.aws/credentials`
 
+## Platform notes
+
+The core scripts (credential export, auth refresh, cred check, statusline) work on **macOS, Linux, and Windows**. The `autoLoginCmd` feature runs your command via the platform's native shell (`/bin/sh` on Unix, `cmd.exe` on Windows). On Windows, use a PowerShell or batch script instead of `expect`.
+
 ## Limitations
 
 - **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes".
-- **Does not automate re-authentication.** You still run your login command manually — but you no longer need to restart Claude Code after doing so.
+- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively (e.g., via `expect` with passwords in your OS keychain). If your login requires MFA push approval, the `expect` script can send a desktop notification — you approve on your phone, and the session resumes.
 
 ## License
 
