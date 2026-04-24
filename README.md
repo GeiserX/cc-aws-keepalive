@@ -8,7 +8,7 @@ Keep Claude Code sessions alive through AWS credential expiration. No more resta
 
 ## Problem
 
-When using Claude Code with AWS Bedrock, the AWS SDK caches credentials in memory. After your SSO/SAML session expires (typically every 8-12 hours), all Claude Code sessions become unresponsive and must be restarted — often corrupting conversations and losing context.
+When using Claude Code with AWS Bedrock, the AWS SDK caches credentials in memory. After your SSO/SAML session expires (typically every 1-12 hours), all Claude Code sessions become unresponsive and must be restarted — often corrupting conversations and losing context.
 
 ## Solution
 
@@ -27,8 +27,9 @@ Four Node.js scripts (cross-platform: macOS, Linux, Windows) that hook into Clau
 
 1. You submit a prompt in Claude Code
 2. The `UserPromptSubmit` hook checks credential expiration
-3. If nearing expiry: inline warning with re-auth instructions
-4. If expired: warns inline — the prompt proceeds and `awsAuthRefresh` handles recovery
+3. If nearing expiry and `autoLoginCmd` is configured: fires it in the background (you get a notification, approve MFA, session renews silently)
+4. If nearing expiry without `autoLoginCmd`: inline warning with re-auth command
+5. If expired: warns inline — the prompt proceeds and `awsAuthRefresh` handles recovery
 
 **After expiry (reactive):**
 
@@ -97,7 +98,7 @@ The installer automatically:
 1. **OMC HUD wrapper**: Cleans up any legacy timer patch from `omc-hud.mjs` and updates the `aws-hud-wrapper.mjs` with the current path
 2. **settings.json paths**: Updates `awsCredentialExport` and `awsAuthRefresh` to point to the new version directory (preserves any custom wrapper commands)
 
-### Configure
+## Configure
 
 Edit `~/.config/cc-aws-keepalive/config.json`:
 
@@ -107,7 +108,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
   "expirationField": "x_security_token_expires",
   "loginCmd": "saml2aws login --profile my-bedrock-profile",
   "autoLoginCmd": "",
-  "autoLoginMinutes": 120,
+  "autoLoginMinutes": 30,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
   "statusLineCmd": ""
@@ -117,11 +118,11 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 | Field | Description |
 |-------|-------------|
 | `profile` | AWS profile name in `~/.aws/credentials` |
-| `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower) |
-| `loginCmd` | Command to re-authenticate (shown in warnings) |
-| `autoLoginCmd` | Command for automated non-interactive re-authentication (e.g., an `expect` script). Must handle password/MFA without a TTY. |
-| `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
-| `warnMinutes` | Minutes before expiry to start warning in the hook |
+| `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower, can only detect expired vs. valid — not time remaining) |
+| `loginCmd` | Command to re-authenticate (shown in warnings so you can copy-paste it) |
+| `autoLoginCmd` | Command for fully automated re-authentication. Must work without a TTY — see [Auto-login setup](#auto-login-setup) below |
+| `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes |
+| `warnMinutes` | Minutes before expiry to start showing warnings |
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |
 | `statusLineCmd` | Existing status line command to compose with (leave empty for standalone) |
 
@@ -129,7 +130,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 
 | Variable | Description |
 |----------|-------------|
-| `CC_KEEPALIVE_PROFILE` | Overrides `profile` from config. Useful for multi-account setups where different terminals use different AWS accounts. |
+| `CC_KEEPALIVE_PROFILE` | Overrides `profile` from config. Useful for multi-account setups where different terminals use different AWS accounts |
 
 **Common `expirationField` values by provider:**
 
@@ -142,7 +143,182 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 
 Check your `~/.aws/credentials` after authenticating to find the field name for your provider.
 
-### Status line timer
+## Auto-login setup
+
+The `autoLoginCmd` feature lets cc-aws-keepalive re-authenticate automatically — no manual terminal switching needed. This section walks through setting it up end-to-end.
+
+### How it triggers
+
+- **Proactive** (before expiry): When you submit a prompt and your session has fewer than `autoLoginMinutes` left, the command fires **in the background**. You keep working while it runs. Rate-limited to once per 5 minutes to avoid spamming.
+- **Reactive** (after expiry): When Claude Code hits a Bedrock 403, the command runs **synchronously** with up to 3 minutes for completion. Since you're blocked waiting for credentials anyway, this is fine.
+
+### Requirements
+
+Your `autoLoginCmd` must:
+
+1. **Run without a TTY** — Claude Code hooks have no terminal attached. Interactive prompts hang forever.
+2. **Handle password input** — pull it from a keychain/vault, not stdin.
+3. **Handle MFA** — either trigger a push notification you approve on your phone, or use a TOTP generator.
+4. **Suppress spinner/progress output** — ANSI escape codes from progress bars break pattern matching in expect scripts. Most CLI tools have a `--no-progress` or `--spinner=false` flag.
+5. **Pre-select the IAM role** — if your tool shows an interactive role chooser, use a CLI flag to filter or pre-select the role. Otherwise, characters from the password prompt can spill into the role selector.
+
+### Step 1: Store your password securely
+
+Never put passwords in config files or environment variables. Use your OS keychain.
+
+**macOS** (Keychain):
+```bash
+security add-generic-password -s cc-aws-keepalive -a mylogin -w 'YourPassword123!'
+# Verify it works:
+security find-generic-password -s cc-aws-keepalive -a mylogin -w
+```
+
+**Linux** (libsecret / GNOME Keyring):
+```bash
+secret-tool store --label="cc-aws-keepalive" service cc-aws-keepalive account mylogin <<< 'YourPassword123!'
+# Verify:
+secret-tool lookup service cc-aws-keepalive account mylogin
+```
+
+**Windows** (Credential Manager via PowerShell):
+```powershell
+# Store
+cmdkey /add:cc-aws-keepalive /user:mylogin /pass:YourPassword123!
+# Retrieve (in your automation script)
+(New-Object System.Net.NetworkCredential((cmdkey /list:cc-aws-keepalive))).Password
+```
+
+Replace `mylogin` with a label that identifies your credential provider account (e.g., `saml2aws`, `awsmyid`).
+
+### Step 2: Write an expect script
+
+[`expect`](https://core.tcl-lang.org/expect/index) drives interactive CLI tools by matching output patterns and sending responses. Install it with `brew install expect` (macOS) or `apt install expect` (Linux).
+
+Here's a template — adapt it to your login tool:
+
+```expect
+#!/usr/bin/env expect
+# Auto-login script for cc-aws-keepalive
+# Adapt the spawn command, password retrieval, and success pattern to your tool.
+
+set timeout 180
+log_user 0
+
+# --- Password retrieval ---
+# macOS Keychain:
+set password [exec security find-generic-password -s cc-aws-keepalive -a mylogin -w]
+# Linux libsecret:
+# set password [exec secret-tool lookup service cc-aws-keepalive account mylogin]
+
+# --- CLI arguments (optional, for flexibility) ---
+set profile [lindex $argv 0]
+if {$profile eq ""} { set profile "default" }
+
+# --- Spawn your login tool ---
+# Key flags:
+#   --spinner=false / --no-progress : suppress ANSI output that breaks expect
+#   -r / --role-filter              : skip interactive role chooser
+#   -f push / --mfa-mode push       : use push MFA instead of TOTP prompt
+#
+# Examples:
+#   saml2aws:  spawn saml2aws login --profile $profile --skip-prompt --disable-keychain
+#   awsmyid:   spawn awsmyid login -p $profile -r bedrock -f push --spinner=false
+#   gimme:     spawn gimme-aws-creds --profile $profile
+spawn your-login-tool login --profile $profile --spinner=false
+
+expect {
+    -re {[Pp]assword} {
+        sleep 0.5
+        send -- "$password\r"
+        exp_continue
+    }
+    -re {push notification|MFA|Okta Verify|Waiting.*approval|verify.*identity} {
+        # macOS desktop notification — reminds you to approve the MFA push
+        exec osascript -e {display notification "Check your authenticator app" with title "AWS Login" subtitle "MFA push sent" sound name "Ping"}
+        # Linux alternative (requires notify-send):
+        # exec notify-send "AWS Login" "MFA push sent — check your authenticator app"
+        exp_continue
+    }
+    -re {hoose.*role|Select.*role} {
+        # Fallback if role filter didn't work — accept first match
+        send "\r"
+        exp_continue
+    }
+    -re {Credentials will expire|Success|Logged in} {
+        puts "Auto-login succeeded"
+    }
+    eof {}
+    timeout {
+        puts stderr "auto-login timed out after 180s"
+        exit 1
+    }
+}
+
+set result [wait]
+exit [lindex $result 3]
+```
+
+Save it to `~/.config/cc-aws-keepalive/auto-login.exp` and make it executable:
+
+```bash
+chmod +x ~/.config/cc-aws-keepalive/auto-login.exp
+```
+
+**Test it manually first:**
+
+```bash
+# This should complete the full login without any manual input
+expect ~/.config/cc-aws-keepalive/auto-login.exp my-profile
+```
+
+If it hangs, run with `log_user 1` (change line 4) to see what the tool is outputting — often it's an unexpected prompt or ANSI escape codes breaking the pattern match.
+
+### Step 3: Configure cc-aws-keepalive
+
+Update your `~/.config/cc-aws-keepalive/config.json`:
+
+```json
+{
+  "profile": "my-bedrock-profile",
+  "expirationField": "x_security_token_expires",
+  "loginCmd": "saml2aws login --profile my-bedrock-profile",
+  "autoLoginCmd": "expect ~/.config/cc-aws-keepalive/auto-login.exp my-bedrock-profile",
+  "autoLoginMinutes": 30,
+  "warnMinutes": 30,
+  "timerWarnMinutes": 60,
+  "statusLineCmd": ""
+}
+```
+
+Key points:
+- `autoLoginCmd` is the full command — it must work when run as `sh -c "your command"` with no TTY
+- `autoLoginMinutes` controls how early the proactive trigger fires (30 = re-auth when 30 minutes remain)
+- `loginCmd` is still shown in manual warnings as a fallback — it's never run automatically
+
+### Common pitfalls
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Script hangs at password prompt | ANSI spinner output breaks the `Password` pattern match | Add `--spinner=false` or `--no-progress` to your spawn command |
+| Wrong IAM role selected | Password characters leak into interactive role chooser | Use a role filter flag (`-r`, `--role`, `--role-filter`) to pre-select |
+| Password not found | Keychain service/account name mismatch | Run the `security find-generic-password` command manually to verify |
+| Times out after 180s | MFA push not approved, or success pattern doesn't match | Set `log_user 1` and run manually to see what the tool outputs after login |
+| `spawn: command not found` | `expect` not installed | `brew install expect` (macOS) or `apt install expect` (Linux) |
+| Works manually but not from cc-aws-keepalive | PATH differs when run from Claude Code | Use full path to your login tool in the spawn command (e.g., `/usr/local/bin/saml2aws`) |
+
+### Windows alternative
+
+Windows doesn't have `expect`. Use a PowerShell script instead:
+
+```powershell
+# auto-login.ps1
+$password = (cmdkey /list:cc-aws-keepalive | Select-String "Password").ToString().Split("=")[1].Trim()
+echo $password | your-login-tool login --profile $args[0] --stdin-password
+```
+
+Set `autoLoginCmd` to: `powershell -File %USERPROFILE%\.config\cc-aws-keepalive\auto-login.ps1 my-profile`
+
+## Status line timer
 
 The optional `aws-statusline.mjs` shows a persistent countdown in the Claude Code status bar:
 
@@ -174,12 +350,12 @@ Works with any tool that **materializes temporary credentials** (`aws_access_key
 
 ## Platform notes
 
-The core scripts (credential export, auth refresh, cred check, statusline) work on **macOS, Linux, and Windows**. The `autoLoginCmd` feature runs your command via the platform's native shell (`/bin/sh` on Unix, `cmd.exe` on Windows). On Windows, use a PowerShell or batch script instead of `expect`.
+The core scripts (credential export, auth refresh, cred check, statusline) work on **macOS, Linux, and Windows**. The `autoLoginCmd` feature runs your command via the platform's native shell (`/bin/sh` on Unix, `cmd.exe` on Windows). On Windows, use a PowerShell script instead of `expect` — see [Windows alternative](#windows-alternative).
 
 ## Limitations
 
 - **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes".
-- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively (e.g., via `expect` with passwords in your OS keychain). If your login requires MFA push approval, the `expect` script can send a desktop notification — you approve on your phone, and the session resumes.
+- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively. See [Auto-login setup](#auto-login-setup) for a complete walkthrough.
 
 ## License
 
