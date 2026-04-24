@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // OMC HUD integration: intercepts stdout, appends AWS session timer.
-// Called via `import` from omc-hud.mjs — do not run standalone.
+// Called via `import` from aws-hud-wrapper.mjs — do not run standalone.
 import { loadConfig, getRemaining, formatTime } from "./lib.mjs";
 
 function awsTimer() {

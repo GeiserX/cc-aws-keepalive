@@ -34,8 +34,9 @@ Four Node.js scripts (cross-platform: macOS, Linux, Windows) that hook into Clau
 
 1. Claude Code hits a Bedrock 403
 2. `awsAuthRefresh` runs — checks if you already re-authed in another terminal
-3. `awsCredentialExport` reads fresh creds from disk (bypassing SDK memory cache)
-4. Claude Code retries the API call — session continues without restart
+3. If still expired and `autoLoginCmd` is configured, runs it synchronously (waits up to 3 minutes for password + MFA)
+4. `awsCredentialExport` reads fresh creds from disk (bypassing SDK memory cache)
+5. Claude Code retries the API call — session continues without restart
 
 ### The key insight
 
@@ -93,7 +94,7 @@ After upgrading, re-run the installer to update paths:
 
 The installer automatically:
 
-1. **OMC HUD patch**: Strips the old timer block and re-inserts with the current path
+1. **OMC HUD wrapper**: Cleans up any legacy timer patch from `omc-hud.mjs` and updates the `aws-hud-wrapper.mjs` with the current path
 2. **settings.json paths**: Updates `awsCredentialExport` and `awsAuthRefresh` to point to the new version directory (preserves any custom wrapper commands)
 
 ### Configure

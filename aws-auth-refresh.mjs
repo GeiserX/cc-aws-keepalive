@@ -32,7 +32,7 @@ if (!info) {
 }
 
 // Try auto-login synchronously (user is blocked anyway — CC waits for this script)
-const autoCmd = config.autoLoginCmd || "";
+const autoCmd = config.autoLoginCmd || config.loginCmd;
 if (autoCmd) {
   console.log("AWS credentials expired. Running auto-login...");
   try {
