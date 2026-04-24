@@ -29,6 +29,7 @@ function writeConfig(home, obj) {
 // because homedir() reads process.env.HOME at call time.  We cache the original
 // HOME and restore it in afterEach.
 const ORIGINAL_HOME = process.env.HOME;
+const ORIGINAL_USERPROFILE = process.env.USERPROFILE;
 
 // ============================================================================
 // formatTime -- pure function, no I/O
@@ -43,6 +44,7 @@ describe("formatTime", () => {
 
   afterEach(() => {
     process.env.HOME = ORIGINAL_HOME;
+    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
   });
 
   it("returns EXPIRED for 0", () => {
@@ -101,6 +103,7 @@ describe("parseCredentials", () => {
   beforeEach(async () => {
     tmpHome = makeTmpHome();
     process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
     // Dynamic import with cache-busting query so the module re-evaluates homedir()
     const mod = await import(`./lib.mjs?pc=${Date.now()}${Math.random()}`);
     parseCredentials = mod.parseCredentials;
@@ -108,6 +111,7 @@ describe("parseCredentials", () => {
 
   afterEach(() => {
     process.env.HOME = ORIGINAL_HOME;
+    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -233,11 +237,13 @@ describe("loadConfig", () => {
   beforeEach(() => {
     tmpHome = makeTmpHome();
     process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
     delete process.env.CC_KEEPALIVE_PROFILE;
   });
 
   afterEach(() => {
     process.env.HOME = ORIGINAL_HOME;
+    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
     delete process.env.CC_KEEPALIVE_PROFILE;
     rmSync(tmpHome, { recursive: true, force: true });
   });
@@ -307,10 +313,12 @@ describe("getRemaining", () => {
   beforeEach(() => {
     tmpHome = makeTmpHome();
     process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
   });
 
   afterEach(() => {
     process.env.HOME = ORIGINAL_HOME;
+    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
     rmSync(tmpHome, { recursive: true, force: true });
   });
 

@@ -45,7 +45,7 @@ describe("aws-cred-export.mjs", () => {
     );
 
     const stdout = execFileSync("node", [SCRIPT], {
-      env: { ...process.env, HOME: tmpHome },
+      env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
       encoding: "utf8",
     });
 
@@ -59,7 +59,7 @@ describe("aws-cred-export.mjs", () => {
     // tmpHome has no .aws directory
     try {
       execFileSync("node", [SCRIPT], {
-        env: { ...process.env, HOME: tmpHome },
+        env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
         encoding: "utf8",
       });
       assert.fail("expected script to exit with code 1");
@@ -83,7 +83,7 @@ describe("aws-cred-export.mjs", () => {
     );
 
     const stdout = execFileSync("node", [SCRIPT], {
-      env: { ...process.env, HOME: tmpHome },
+      env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
       encoding: "utf8",
     });
 
