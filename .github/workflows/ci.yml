@@ -28,7 +28,6 @@ jobs:
           done
 
       - name: Run unit tests
-        shell: bash
         run: npm test
 
       - name: Validate JSON files
@@ -40,6 +39,7 @@ jobs:
           done
 
       - name: Verify installer runs (manual mode)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -49,6 +49,7 @@ jobs:
           grep -q "credential refresh + proactive hook" output.txt
 
       - name: Verify OMC wrapper install and idempotency
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -74,6 +75,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify legacy patch cleanup
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -97,6 +99,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify plugin mode and settings update
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           export HOME=$(mktemp -d)
