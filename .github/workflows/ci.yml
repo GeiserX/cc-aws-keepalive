@@ -7,10 +7,11 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         node-version: [18, 20, 22]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,13 +19,19 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Syntax check all scripts
+        shell: bash
         run: |
           for f in *.mjs; do
             echo "Checking $f..."
             node --check "$f"
           done
 
+      - name: Run unit tests
+        shell: bash
+        run: npm test
+
       - name: Validate JSON files
+        shell: bash
         run: |
           for f in config.example.json hooks/hooks.json .claude-plugin/plugin.json .claude-plugin/marketplace.json package.json; do
             echo "Validating $f..."
@@ -32,6 +39,7 @@ jobs:
           done
 
       - name: Verify installer runs (manual mode)
+        shell: bash
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws"
@@ -40,6 +48,7 @@ jobs:
           grep -q "credential refresh + proactive hook" output.txt
 
       - name: Verify OMC wrapper install and idempotency
+        shell: bash
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws" "$HOME/.claude/hud"
@@ -64,6 +73,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify legacy patch cleanup
+        shell: bash
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws" "$HOME/.claude/hud"
@@ -86,6 +96,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify plugin mode and settings update
+        shell: bash
         run: |
           export HOME=$(mktemp -d)
           mkdir -p "$HOME/.aws"

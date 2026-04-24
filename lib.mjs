@@ -24,14 +24,40 @@ export function loadConfig() {
   const config = { ...DEFAULTS };
   if (existsSync(CONFIG_PATH)) {
     try {
-      Object.assign(config, JSON.parse(readFileSync(CONFIG_PATH, "utf8")));
-    } catch {
-      // Bad config — use defaults
+      const parsed = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+      // Warn on unknown keys
+      for (const key of Object.keys(parsed)) {
+        if (!(key in DEFAULTS)) {
+          process.stderr.write(`cc-aws-keepalive: unknown config key "${key}" (typo?)\n`);
+        }
+      }
+      // Type-coerce numeric fields, warn on bad types
+      for (const [key, def] of Object.entries(DEFAULTS)) {
+        if (key in parsed) {
+          const val = parsed[key];
+          const expected = typeof def;
+          if (expected === "number" && typeof val === "string") {
+            const num = Number(val);
+            if (!isNaN(num)) { parsed[key] = num; }
+            else { process.stderr.write(`cc-aws-keepalive: "${key}" should be a number, got "${val}"\n`); }
+          } else if (expected === "string" && typeof val !== "string") {
+            process.stderr.write(`cc-aws-keepalive: "${key}" should be a string, got ${typeof val}\n`);
+            parsed[key] = String(val);
+          }
+        }
+      }
+      Object.assign(config, parsed);
+    } catch (e) {
+      process.stderr.write(`cc-aws-keepalive: config.json is malformed (${e.message}). Using defaults.\n`);
     }
   }
   // Env override
   if (process.env.CC_KEEPALIVE_PROFILE) {
     config.profile = process.env.CC_KEEPALIVE_PROFILE;
+  }
+  // Warn about ineffective auto-login config
+  if (config.autoLoginMinutes > 0 && !config.expirationField) {
+    process.stderr.write("cc-aws-keepalive: autoLoginMinutes requires expirationField to be set. Auto-login disabled.\n");
   }
   return config;
 }

@@ -125,6 +125,23 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |
 | `statusLineCmd` | Existing status line command to compose with (leave empty for standalone) |
 
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `CC_KEEPALIVE_PROFILE` | Overrides `profile` from config. Useful for multi-account setups where different terminals use different AWS accounts. |
+
+**Common `expirationField` values by provider:**
+
+| Provider | `expirationField` value |
+|----------|------------------------|
+| saml2aws | `x_security_token_expires` |
+| gimme-aws-creds | `x_security_token_expires` |
+| awsmyid | `awsmyid_session_expiration` |
+| aws-google-auth | `x_security_token_expires` |
+
+Check your `~/.aws/credentials` after authenticating to find the field name for your provider.
+
 ### Status line timer
 
 The optional `aws-statusline.mjs` shows a persistent countdown in the Claude Code status bar:
@@ -155,10 +172,14 @@ Works with any tool that **materializes temporary credentials** (`aws_access_key
 - Node.js (ships with Claude Code)
 - Any AWS credential provider that writes to `~/.aws/credentials`
 
+## Platform notes
+
+The core scripts (credential export, auth refresh, cred check, statusline) work on **macOS, Linux, and Windows**. The `autoLoginCmd` feature runs your command via the platform's native shell (`/bin/sh` on Unix, `cmd.exe` on Windows). On Windows, use a PowerShell or batch script instead of `expect`.
+
 ## Limitations
 
 - **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes".
-- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively (e.g., via `expect` with passwords in your OS keychain). If your login requires interactive MFA that cannot be automated, the script will send a desktop notification — you approve on your phone, and the session resumes.
+- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively (e.g., via `expect` with passwords in your OS keychain). If your login requires MFA push approval, the `expect` script can send a desktop notification — you approve on your phone, and the session resumes.
 
 ## License
 
