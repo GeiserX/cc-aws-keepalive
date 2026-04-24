@@ -2,10 +2,11 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
-const SCRIPT = join(import.meta.dirname, "aws-cred-export.mjs");
+const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "aws-cred-export.mjs");
 
 function makeTmpHome() {
   return mkdtempSync(join(tmpdir(), "cckeep-export-"));
