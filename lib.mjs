@@ -78,6 +78,7 @@ export function parseCredentials(profile) {
       inProfile = profileMatch[1] === profile;
       continue;
     }
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith(";")) continue;
     if (inProfile && trimmed.includes("=")) {
       const eqIdx = trimmed.indexOf("=");
       const key = trimmed.slice(0, eqIdx).trim();
@@ -93,8 +94,10 @@ export function getRemaining(config) {
   const creds = parseCredentials(config.profile);
   if (!creds || !config.expirationField) return null;
 
-  const exp = parseInt(creds[config.expirationField], 10);
-  if (isNaN(exp)) return null;
+  const raw = creds[config.expirationField];
+  if (!/^\d+$/.test(raw)) return null;
+  const exp = parseInt(raw, 10);
+  if (exp < 1_000_000_000) return null; // reject non-epoch values (before 2001-09-09)
 
   return { remaining: exp - Math.floor(Date.now() / 1000), expiration: exp };
 }

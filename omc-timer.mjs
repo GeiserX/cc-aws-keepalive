@@ -23,7 +23,13 @@ export function patchStdout() {
   const chunks = [];
   const origWrite = process.stdout.write.bind(process.stdout);
   process.stdout.write = (chunk, encoding, callback) => {
-    chunks.push(String(chunk));
+    if (typeof chunk === "string") {
+      chunks.push(chunk);
+    } else if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk.toString(typeof encoding === "string" ? encoding : "utf8"));
+    } else {
+      chunks.push(String(chunk));
+    }
     if (typeof encoding === "function") encoding();
     else if (typeof callback === "function") callback();
     return true;

@@ -225,6 +225,39 @@ describe("parseCredentials", () => {
     const result = parseCredentials("default");
     assert.equal(result, null);
   });
+
+  it("skips comment lines starting with #", () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "# This is a comment",
+        "aws_access_key_id = AKIACOMMENT",
+        "# Another comment",
+        "aws_secret_access_key = SECRETCOMMENT",
+      ].join("\n")
+    );
+
+    const result = parseCredentials("default");
+    assert.equal(result.aws_access_key_id, "AKIACOMMENT");
+    assert.equal(result.aws_secret_access_key, "SECRETCOMMENT");
+    assert.equal(Object.keys(result).length, 2);
+  });
+
+  it("skips comment lines starting with ;", () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "; semicolon comment",
+        "aws_access_key_id = AKIASEMI",
+      ].join("\n")
+    );
+
+    const result = parseCredentials("default");
+    assert.equal(result.aws_access_key_id, "AKIASEMI");
+    assert.equal(Object.keys(result).length, 1);
+  });
 });
 
 // ============================================================================
@@ -344,6 +377,46 @@ describe("getRemaining", () => {
         "[default]",
         "aws_access_key_id = KEY",
         "x_expiration = not-a-number",
+      ].join("\n")
+    );
+
+    const { getRemaining } = await import(
+      `./lib.mjs?gr=${Date.now()}${Math.random()}`
+    );
+    const result = getRemaining({
+      profile: "default",
+      expirationField: "x_expiration",
+    });
+    assert.equal(result, null);
+  });
+
+  it("returns null for ISO-8601 date string", async () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "aws_access_key_id = KEY",
+        "x_expiration = 2026-04-24T12:00:00Z",
+      ].join("\n")
+    );
+
+    const { getRemaining } = await import(
+      `./lib.mjs?gr=${Date.now()}${Math.random()}`
+    );
+    const result = getRemaining({
+      profile: "default",
+      expirationField: "x_expiration",
+    });
+    assert.equal(result, null);
+  });
+
+  it("returns null for sub-epoch value", async () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "aws_access_key_id = KEY",
+        "x_expiration = 12345",
       ].join("\n")
     );
 
