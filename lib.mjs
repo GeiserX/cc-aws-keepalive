@@ -13,6 +13,7 @@ const DEFAULTS = {
   profile: "default",
   expirationField: "",
   loginCmd: "",
+  autoLoginCmd: "",
   autoLoginMinutes: 0,
   warnMinutes: 30,
   timerWarnMinutes: 60,

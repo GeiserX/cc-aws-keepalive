@@ -29,8 +29,9 @@ if (info) {
   }
 }
 
-// Auto-login: silently re-authenticate when within the configured window
-if (autoLoginSeconds > 0 && config.loginCmd && remaining > 0 && remaining <= autoLoginSeconds) {
+// Auto-login: re-authenticate when within the configured window
+const autoCmd = config.autoLoginCmd || config.loginCmd;
+if (autoLoginSeconds > 0 && autoCmd && remaining > 0 && remaining <= autoLoginSeconds) {
   const stateDir = join(homedir(), ".config", "cc-aws-keepalive");
   const lockFile = join(stateDir, ".last-auto-login");
   const cooldownSec = 300; // Don't retry more than once per 5 minutes
@@ -47,15 +48,16 @@ if (autoLoginSeconds > 0 && config.loginCmd && remaining > 0 && remaining <= aut
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(lockFile, String(Math.floor(Date.now() / 1000)));
     try {
-      execSync(config.loginCmd, { stdio: "ignore", timeout: 30_000 });
-      // Re-check credentials after login
-      const refreshed = getRemaining(config);
-      if (refreshed && refreshed.remaining > autoLoginSeconds) {
-        process.stderr.write(
-          `AWS session auto-renewed (valid for ${formatTime(refreshed.remaining)}).\n`
-        );
-        process.exit(0);
-      }
+      // Spawn detached so it doesn't block the prompt (may need MFA push)
+      const { spawn } = await import("node:child_process");
+      const child = spawn("sh", ["-c", autoCmd], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      process.stderr.write(
+        `AWS auto-login started in background (${formatTime(remaining)} remaining).\n`
+      );
     } catch {
       process.stderr.write(
         `Auto-login failed. Run manually: ${config.loginCmd}\n`

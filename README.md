@@ -116,8 +116,9 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 |-------|-------------|
 | `profile` | AWS profile name in `~/.aws/credentials` |
 | `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower) |
-| `loginCmd` | Command to re-authenticate (shown in warnings, used by auto-login) |
-| `autoLoginMinutes` | Auto-run `loginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
+| `loginCmd` | Command to re-authenticate (shown in warnings) |
+| `autoLoginCmd` | Command for automated re-authentication (e.g., an `expect` script that drives interactive login). Falls back to `loginCmd` if empty. |
+| `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
 | `warnMinutes` | Minutes before expiry to start warning in the hook |
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |
 | `statusLineCmd` | Existing status line command to compose with (leave empty for standalone) |
@@ -155,7 +156,7 @@ Works with any tool that **materializes temporary credentials** (`aws_access_key
 ## Limitations
 
 - **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes".
-- **Does not automate re-authentication.** You still run your login command manually — but you no longer need to restart Claude Code after doing so.
+- **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively (e.g., via `expect` with passwords in your OS keychain). If your login requires interactive MFA that cannot be automated, the script will send a desktop notification — you approve on your phone, and the session resumes.
 
 ## License
 
