@@ -232,10 +232,20 @@ expect {
         send -- "$password\r"
         exp_continue
     }
-    -re {push notification|MFA|Okta Verify|Waiting.*approval|verify.*identity} {
-        # macOS desktop notification — reminds you to approve the MFA push
-        exec osascript -e {display notification "Check your authenticator app" with title "AWS Login" subtitle "MFA push sent" sound name "Ping"}
+    -re {MFA Number:\s*(\d+)} {
+        # Okta number matching challenge — show the code in a desktop notification
+        set mfa_number $expect_out(1,string)
+        # macOS:
+        exec osascript -e "display notification \"Enter $mfa_number on your phone\" with title \"AWS MFA\" subtitle \"Number: $mfa_number\" sound name \"Ping\""
         # Linux alternative (requires notify-send):
+        # exec notify-send "AWS MFA" "Enter $mfa_number on your phone"
+        exp_continue
+    }
+    -re {push notification|Okta Verify|Waiting.*approval|verify.*identity|Please Approve} {
+        # Simple push MFA (no number) — just remind to approve
+        # macOS:
+        exec osascript -e {display notification "Check your authenticator app" with title "AWS Login" subtitle "MFA push sent" sound name "Ping"}
+        # Linux alternative:
         # exec notify-send "AWS Login" "MFA push sent — check your authenticator app"
         exp_continue
     }
@@ -303,6 +313,7 @@ Key points:
 | Wrong IAM role selected | Password characters leak into interactive role chooser | Use a role filter flag (`-r`, `--role`, `--role-filter`) to pre-select |
 | Password not found | Keychain service/account name mismatch | Run the `security find-generic-password` command manually to verify |
 | Times out after 180s | MFA push not approved, or success pattern doesn't match | Set `log_user 1` and run manually to see what the tool outputs after login |
+| MFA number not showing | Number matching pattern doesn't match your tool's output | Set `log_user 1`, run manually, and look for the line containing the number. Update the `-re {MFA Number:\s*(\d+)}` pattern to match |
 | `spawn: command not found` | `expect` not installed | `brew install expect` (macOS) or `apt install expect` (Linux) |
 | Works manually but not from cc-aws-keepalive | PATH differs when run from Claude Code | Use full path to your login tool in the spawn command (e.g., `/usr/local/bin/saml2aws`) |
 
