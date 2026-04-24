@@ -2,9 +2,6 @@
 // Called by Claude Code (awsAuthRefresh) when Bedrock auth fails.
 // Tries auto-login if configured, otherwise prompts user to re-auth manually.
 import { execSync, execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { loadConfig, getRemaining, formatTime } from "./lib.mjs";
 
 const config = loadConfig();
@@ -23,6 +20,7 @@ if (!info) {
   try {
     execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
       stdio: "ignore",
+      timeout: 15_000,
     });
     console.log("Credentials valid. Retrying...");
     process.exit(0);

@@ -2,8 +2,7 @@
 // UserPromptSubmit hook: proactive AWS credential expiry check.
 // Warns via stderr if expired or nearing expiry (never blocks — blocked prompts are discarded by CC).
 // Optionally auto-renews credentials when within autoLoginMinutes window.
-import { execSync } from "node:child_process";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +21,7 @@ if (info) {
   try {
     execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
       stdio: "ignore",
+      timeout: 10_000,
     });
     process.exit(0); // Valid, can't determine remaining time
   } catch {
@@ -30,7 +30,8 @@ if (info) {
 }
 
 // Auto-login: re-authenticate when within the configured window
-const autoCmd = config.autoLoginCmd || config.loginCmd;
+// Only use autoLoginCmd (designed for non-interactive use), never loginCmd (may need a TTY)
+const autoCmd = config.autoLoginCmd;
 if (autoLoginSeconds > 0 && autoCmd && remaining > 0 && remaining <= autoLoginSeconds) {
   const stateDir = join(homedir(), ".config", "cc-aws-keepalive");
   const lockFile = join(stateDir, ".last-auto-login");
@@ -45,16 +46,17 @@ if (autoLoginSeconds > 0 && autoCmd && remaining > 0 && remaining <= autoLoginSe
   }
 
   if (shouldRun) {
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(lockFile, String(Math.floor(Date.now() / 1000)));
     try {
+      mkdirSync(stateDir, { recursive: true });
       // Spawn detached so it doesn't block the prompt (may need MFA push)
-      const { spawn } = await import("node:child_process");
-      const child = spawn("sh", ["-c", autoCmd], {
+      const child = spawn(autoCmd, {
+        shell: true,
         detached: true,
         stdio: "ignore",
       });
       child.unref();
+      // Write lockfile after successful spawn (not before)
+      writeFileSync(lockFile, String(Math.floor(Date.now() / 1000)));
       process.stderr.write(
         `AWS auto-login started in background (${formatTime(remaining)} remaining).\n`
       );

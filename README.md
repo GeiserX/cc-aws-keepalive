@@ -69,7 +69,7 @@ The plugin auto-registers the `UserPromptSubmit` hook. You still need to add `aw
 }
 ```
 
-Replace `<version>` with the installed version (e.g., `0.1.0`). Then create and edit your config:
+Replace `<version>` with the installed version (e.g., `0.3.0`). Then create and edit your config:
 
 ```bash
 cp config.example.json ~/.config/cc-aws-keepalive/config.json
@@ -106,6 +106,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
   "profile": "my-bedrock-profile",
   "expirationField": "x_security_token_expires",
   "loginCmd": "saml2aws login --profile my-bedrock-profile",
+  "autoLoginCmd": "",
   "autoLoginMinutes": 120,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
@@ -118,7 +119,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 | `profile` | AWS profile name in `~/.aws/credentials` |
 | `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower) |
 | `loginCmd` | Command to re-authenticate (shown in warnings) |
-| `autoLoginCmd` | Command for automated re-authentication (e.g., an `expect` script that drives interactive login). Falls back to `loginCmd` if empty. |
+| `autoLoginCmd` | Command for automated non-interactive re-authentication (e.g., an `expect` script). Must handle password/MFA without a TTY. |
 | `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes. |
 | `warnMinutes` | Minutes before expiry to start warning in the hook |
 | `timerWarnMinutes` | Minutes before expiry to turn the statusline timer red |

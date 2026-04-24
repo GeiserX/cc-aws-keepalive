@@ -16,7 +16,10 @@ function awsTimer() {
   } catch { return ""; }
 }
 
+let patched = false;
 export function patchStdout() {
+  if (patched) return;
+  patched = true;
   const chunks = [];
   const origWrite = process.stdout.write.bind(process.stdout);
   process.stdout.write = (chunk, encoding, callback) => {
@@ -28,7 +31,7 @@ export function patchStdout() {
   process.on("exit", () => {
     process.stdout.write = origWrite;
     const raw = chunks.join("");
-    const lines = raw.split("\n");
+    const lines = raw.split(/\r?\n/);
     // Remove trailing empty element from split (artifact of trailing \n)
     if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
     const timer = awsTimer();
