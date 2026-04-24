@@ -203,6 +203,7 @@ Here's a template — adapt it to your login tool:
 
 set timeout 180
 log_user 0
+set notified 0
 
 # --- Password retrieval ---
 # macOS Keychain:
@@ -234,19 +235,26 @@ expect {
     }
     -re {MFA Number:\s*(\d+)} {
         # Okta number matching challenge — show the code in a desktop notification
-        set mfa_number $expect_out(1,string)
-        # macOS:
-        exec osascript -e "display notification \"Enter $mfa_number on your phone\" with title \"AWS MFA\" subtitle \"Number: $mfa_number\" sound name \"Ping\""
-        # Linux alternative (requires notify-send):
-        # exec notify-send "AWS MFA" "Enter $mfa_number on your phone"
+        # Guard: only notify once per login (tools may retry and output multiple numbers)
+        if {!$notified} {
+            set notified 1
+            set mfa_number $expect_out(1,string)
+            # macOS:
+            exec osascript -e "display notification \"Enter $mfa_number on your phone\" with title \"AWS MFA\" subtitle \"Number: $mfa_number\" sound name \"Ping\""
+            # Linux alternative (requires notify-send):
+            # exec notify-send "AWS MFA" "Enter $mfa_number on your phone"
+        }
         exp_continue
     }
     -re {push notification|Okta Verify|Waiting.*approval|verify.*identity|Please Approve} {
         # Simple push MFA (no number) — just remind to approve
-        # macOS:
-        exec osascript -e {display notification "Check your authenticator app" with title "AWS Login" subtitle "MFA push sent" sound name "Ping"}
-        # Linux alternative:
-        # exec notify-send "AWS Login" "MFA push sent — check your authenticator app"
+        if {!$notified} {
+            set notified 1
+            # macOS:
+            exec osascript -e {display notification "Check your authenticator app" with title "AWS Login" subtitle "MFA push sent" sound name "Ping"}
+            # Linux alternative:
+            # exec notify-send "AWS Login" "MFA push sent — check your authenticator app"
+        }
         exp_continue
     }
     -re {hoose.*role|Select.*role} {
