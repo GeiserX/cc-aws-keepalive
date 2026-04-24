@@ -27,6 +27,9 @@ export function patchStdout() {
       chunks.push(chunk);
     } else if (Buffer.isBuffer(chunk)) {
       chunks.push(chunk.toString(typeof encoding === "string" ? encoding : "utf8"));
+    } else if (chunk instanceof Uint8Array) {
+      chunks.push(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+        .toString(typeof encoding === "string" ? encoding : "utf8"));
     } else {
       chunks.push(String(chunk));
     }

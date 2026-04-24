@@ -430,6 +430,26 @@ describe("getRemaining", () => {
     assert.equal(result, null);
   });
 
+  it("returns null for digits with trailing junk", async () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "aws_access_key_id = KEY",
+        "x_expiration = 9999999999abc",
+      ].join("\n")
+    );
+
+    const { getRemaining } = await import(
+      `./lib.mjs?gr=${Date.now()}${Math.random()}`
+    );
+    const result = getRemaining({
+      profile: "default",
+      expirationField: "x_expiration",
+    });
+    assert.equal(result, null);
+  });
+
   it("returns positive remaining for future expiry", async () => {
     const futureEpoch = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
     writeCredentials(
