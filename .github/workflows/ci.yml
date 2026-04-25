@@ -30,6 +30,18 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: Run coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        run: npx c8 --reporter=lcov node --test
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Validate JSON files
         shell: bash
         run: |
