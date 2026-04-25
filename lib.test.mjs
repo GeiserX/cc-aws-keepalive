@@ -334,6 +334,82 @@ describe("loadConfig", () => {
     const config = loadConfig();
     assert.equal(config.profile, "from-env");
   });
+
+  it("warns on unknown config keys", async () => {
+    writeConfig(tmpHome, { profile: "default", bogusKey: "oops" });
+    const chunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    loadConfig();
+    process.stderr.write = origWrite;
+
+    const output = chunks.join("");
+    assert.ok(output.includes('unknown config key "bogusKey"'), `expected unknown key warning, got: ${output}`);
+  });
+
+  it("coerces numeric string values to numbers", async () => {
+    writeConfig(tmpHome, { warnMinutes: "15" });
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    const config = loadConfig();
+    assert.equal(config.warnMinutes, 15);
+    assert.equal(typeof config.warnMinutes, "number");
+  });
+
+  it("warns when numeric field gets non-numeric string", async () => {
+    writeConfig(tmpHome, { warnMinutes: "notanumber" });
+    const chunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    loadConfig();
+    process.stderr.write = origWrite;
+
+    const output = chunks.join("");
+    assert.ok(output.includes('"warnMinutes" should be a number'), `expected type warning, got: ${output}`);
+  });
+
+  it("warns and coerces when string field gets non-string value", async () => {
+    writeConfig(tmpHome, { profile: 123 });
+    const chunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    const config = loadConfig();
+    process.stderr.write = origWrite;
+
+    const output = chunks.join("");
+    assert.ok(output.includes('"profile" should be a string'), `expected type warning, got: ${output}`);
+    assert.equal(config.profile, "123");
+  });
+
+  it("warns when autoLoginMinutes set without expirationField", async () => {
+    writeConfig(tmpHome, { autoLoginMinutes: 10, expirationField: "" });
+    const chunks = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    loadConfig();
+    process.stderr.write = origWrite;
+
+    const output = chunks.join("");
+    assert.ok(output.includes("autoLoginMinutes requires expirationField"), `expected auto-login warning, got: ${output}`);
+  });
 });
 
 // ============================================================================
