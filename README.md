@@ -2,6 +2,10 @@
   <img src="docs/images/banner.svg" alt="cc-aws-keepalive banner" width="900"/>
 </p>
 
+<p align="center">
+  <a href="https://codecov.io/gh/GeiserX/cc-aws-keepalive"><img src="https://codecov.io/gh/GeiserX/cc-aws-keepalive/graph/badge.svg" alt="codecov"></a>
+</p>
+
 # cc-aws-keepalive
 
 Keep Claude Code sessions alive through AWS credential expiration. No more restarting terminal tabs every time your SSO/SAML session expires.
