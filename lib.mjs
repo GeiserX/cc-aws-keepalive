@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -108,4 +108,27 @@ export function formatTime(seconds) {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h${m}m`;
   return m > 0 ? `${m}m` : "<1m";
+}
+
+const STATE_DIR = join(homedir(), ".config", "cc-aws-keepalive");
+const LOCK_FILE = join(STATE_DIR, ".auto-login.lock");
+const LOCK_MAX_AGE_SEC = 300;
+
+export function tryAcquireAutoLoginLock() {
+  try {
+    const existing = readFileSync(LOCK_FILE, "utf8").trim();
+    const age = Date.now() / 1000 - parseInt(existing, 10);
+    if (age < LOCK_MAX_AGE_SEC) return false;
+    unlinkSync(LOCK_FILE);
+  } catch { /* no lockfile or unreadable — proceed */ }
+  try {
+    writeFileSync(LOCK_FILE, String(Math.floor(Date.now() / 1000)), { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function releaseAutoLoginLock() {
+  try { unlinkSync(LOCK_FILE); } catch { /* already gone */ }
 }
