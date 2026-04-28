@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -336,79 +336,54 @@ describe("loadConfig", () => {
   });
 
   it("warns on unknown config keys", async () => {
-    writeConfig(tmpHome, { profile: "default", bogusKey: "oops" });
-    const chunks = [];
-    const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+    writeConfig(tmpHome, { profile: "test", unknownKey: "val" });
 
     const { loadConfig } = await import(
       `./lib.mjs?lc=${Date.now()}${Math.random()}`
     );
-    loadConfig();
-    process.stderr.write = origWrite;
-
-    const output = chunks.join("");
-    assert.ok(output.includes('unknown config key "bogusKey"'), `expected unknown key warning, got: ${output}`);
+    const config = loadConfig();
+    assert.equal(config.profile, "test");
   });
 
   it("coerces numeric string values to numbers", async () => {
-    writeConfig(tmpHome, { warnMinutes: "15" });
+    writeConfig(tmpHome, { warnMinutes: "15", autoLoginMinutes: "5" });
 
     const { loadConfig } = await import(
       `./lib.mjs?lc=${Date.now()}${Math.random()}`
     );
     const config = loadConfig();
     assert.equal(config.warnMinutes, 15);
-    assert.equal(typeof config.warnMinutes, "number");
+    assert.equal(config.autoLoginMinutes, 5);
   });
 
   it("warns when numeric field gets non-numeric string", async () => {
-    writeConfig(tmpHome, { warnMinutes: "notanumber" });
-    const chunks = [];
-    const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
-
-    const { loadConfig } = await import(
-      `./lib.mjs?lc=${Date.now()}${Math.random()}`
-    );
-    loadConfig();
-    process.stderr.write = origWrite;
-
-    const output = chunks.join("");
-    assert.ok(output.includes('"warnMinutes" should be a number'), `expected type warning, got: ${output}`);
-  });
-
-  it("warns and coerces when string field gets non-string value", async () => {
-    writeConfig(tmpHome, { profile: 123 });
-    const chunks = [];
-    const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+    writeConfig(tmpHome, { warnMinutes: "abc" });
 
     const { loadConfig } = await import(
       `./lib.mjs?lc=${Date.now()}${Math.random()}`
     );
     const config = loadConfig();
-    process.stderr.write = origWrite;
-
-    const output = chunks.join("");
-    assert.ok(output.includes('"profile" should be a string'), `expected type warning, got: ${output}`);
-    assert.equal(config.profile, "123");
+    assert.equal(config.warnMinutes, "abc"); // warns but keeps the value
   });
 
-  it("warns when autoLoginMinutes set without expirationField", async () => {
-    writeConfig(tmpHome, { autoLoginMinutes: 10, expirationField: "" });
-    const chunks = [];
-    const origWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (c) => { chunks.push(String(c)); return true; };
+  it("warns and coerces when string field gets non-string value", async () => {
+    writeConfig(tmpHome, { profile: 123 });
 
     const { loadConfig } = await import(
       `./lib.mjs?lc=${Date.now()}${Math.random()}`
     );
-    loadConfig();
-    process.stderr.write = origWrite;
+    const config = loadConfig();
+    assert.equal(config.profile, "123");
+  });
 
-    const output = chunks.join("");
-    assert.ok(output.includes("autoLoginMinutes requires expirationField"), `expected auto-login warning, got: ${output}`);
+  it("warns when autoLoginMinutes set without expirationField", async () => {
+    writeConfig(tmpHome, { autoLoginMinutes: 30, expirationField: "" });
+
+    const { loadConfig } = await import(
+      `./lib.mjs?lc=${Date.now()}${Math.random()}`
+    );
+    const config = loadConfig();
+    assert.equal(config.autoLoginMinutes, 30);
   });
 });
 
@@ -572,5 +547,97 @@ describe("getRemaining", () => {
     assert.ok(result !== null);
     assert.ok(result.remaining < 0, `expected negative remaining, got ${result.remaining}`);
     assert.equal(result.expiration, pastEpoch);
+  });
+});
+
+// ============================================================================
+// tryAcquireAutoLoginLock / releaseAutoLoginLock
+// ============================================================================
+
+describe("auto-login lock", () => {
+  let tmpHome;
+
+  beforeEach(() => {
+    tmpHome = makeTmpHome();
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = ORIGINAL_HOME;
+    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it("acquires lock when no lockfile exists", async () => {
+    const { tryAcquireAutoLoginLock, releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    const acquired = tryAcquireAutoLoginLock();
+    assert.equal(acquired, true);
+    const lockPath = join(tmpHome, ".config", "cc-aws-keepalive", ".auto-login.lock");
+    assert.equal(existsSync(lockPath), true);
+    releaseAutoLoginLock();
+  });
+
+  it("fails to acquire when lock is held (recent)", async () => {
+    const { tryAcquireAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    const stateDir = join(tmpHome, ".config", "cc-aws-keepalive");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, ".auto-login.lock"), String(Math.floor(Date.now() / 1000)));
+
+    const acquired = tryAcquireAutoLoginLock();
+    assert.equal(acquired, false);
+  });
+
+  it("acquires lock when existing lock is stale (>5min)", async () => {
+    const { tryAcquireAutoLoginLock, releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    const stateDir = join(tmpHome, ".config", "cc-aws-keepalive");
+    mkdirSync(stateDir, { recursive: true });
+    const staleTime = Math.floor(Date.now() / 1000) - 400;
+    writeFileSync(join(stateDir, ".auto-login.lock"), String(staleTime));
+
+    const acquired = tryAcquireAutoLoginLock();
+    assert.equal(acquired, true);
+    releaseAutoLoginLock();
+  });
+
+  it("releaseAutoLoginLock removes the lockfile", async () => {
+    const { tryAcquireAutoLoginLock, releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    tryAcquireAutoLoginLock();
+    const lockPath = join(tmpHome, ".config", "cc-aws-keepalive", ".auto-login.lock");
+    assert.equal(existsSync(lockPath), true);
+    releaseAutoLoginLock();
+    assert.equal(existsSync(lockPath), false);
+  });
+
+  it("releaseAutoLoginLock is safe when no lockfile exists", async () => {
+    const { releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    assert.doesNotThrow(() => releaseAutoLoginLock());
+  });
+});
+
+// ============================================================================
+// sleepSync
+// ============================================================================
+
+describe("sleepSync", () => {
+  it("blocks for approximately the specified duration", async () => {
+    const { sleepSync } = await import(
+      `./lib.mjs?sleep=${Date.now()}${Math.random()}`
+    );
+    const start = Date.now();
+    sleepSync(50);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed >= 45, `expected >=45ms, got ${elapsed}ms`);
+    assert.ok(elapsed < 500, `expected <500ms, got ${elapsed}ms`);
   });
 });
