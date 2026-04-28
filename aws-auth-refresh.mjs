@@ -2,7 +2,7 @@
 // Called by Claude Code (awsAuthRefresh) when Bedrock auth fails.
 // Tries auto-login if configured, otherwise prompts user to re-auth manually.
 import { execSync, execFileSync } from "node:child_process";
-import { loadConfig, getRemaining, formatTime, tryAcquireAutoLoginLock, releaseAutoLoginLock } from "./lib.mjs";
+import { loadConfig, getRemaining, formatTime, tryAcquireAutoLoginLock, releaseAutoLoginLock, sleepSync } from "./lib.mjs";
 
 const config = loadConfig();
 
@@ -44,7 +44,17 @@ if (autoCmd) {
         );
         process.exit(0);
       }
-      execSync("sleep 3", { stdio: "ignore" });
+      if (!check) {
+        try {
+          execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
+            stdio: "ignore",
+            timeout: 15_000,
+          });
+          console.log("Credentials refreshed by another session. Retrying...");
+          process.exit(0);
+        } catch { /* still invalid */ }
+      }
+      sleepSync(3000);
     }
   } else {
     console.log("AWS credentials expired. Running auto-login...");

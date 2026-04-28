@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -115,6 +115,7 @@ const LOCK_FILE = join(STATE_DIR, ".auto-login.lock");
 const LOCK_MAX_AGE_SEC = 300;
 
 export function tryAcquireAutoLoginLock() {
+  try { mkdirSync(STATE_DIR, { recursive: true }); } catch { return false; }
   try {
     const existing = readFileSync(LOCK_FILE, "utf8").trim();
     const age = Date.now() / 1000 - parseInt(existing, 10);
@@ -131,4 +132,9 @@ export function tryAcquireAutoLoginLock() {
 
 export function releaseAutoLoginLock() {
   try { unlinkSync(LOCK_FILE); } catch { /* already gone */ }
+}
+
+const _sleepBuf = new Int32Array(new SharedArrayBuffer(4));
+export function sleepSync(ms) {
+  Atomics.wait(_sleepBuf, 0, 0, ms);
 }
