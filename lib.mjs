@@ -119,7 +119,7 @@ export function tryAcquireAutoLoginLock() {
   try {
     const existing = readFileSync(LOCK_FILE, "utf8").trim();
     const age = Date.now() / 1000 - parseInt(existing, 10);
-    if (age < LOCK_MAX_AGE_SEC) return false;
+    if (age >= 0 && age < LOCK_MAX_AGE_SEC) return false;
     unlinkSync(LOCK_FILE);
   } catch { /* no lockfile or unreadable — proceed */ }
   try {

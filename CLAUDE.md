@@ -1,4 +1,4 @@
-# AGENTS.md - cc-aws-keepalive
+# CLAUDE.md - cc-aws-keepalive
 
 Claude Code plugin that keeps Bedrock sessions alive through AWS credential expiration.
 
