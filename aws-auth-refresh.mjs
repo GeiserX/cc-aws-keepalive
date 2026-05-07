@@ -21,6 +21,7 @@ if (!info) {
     execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
       stdio: "ignore",
       timeout: 15_000,
+      shell: process.platform === "win32",
     });
     console.log("Credentials valid. Retrying...");
     process.exit(0);
@@ -30,7 +31,8 @@ if (!info) {
 }
 
 // Try auto-login synchronously (user is blocked anyway — CC waits for this script)
-const autoCmd = config.autoLoginCmd || config.loginCmd;
+// Only use autoLoginCmd — loginCmd may be interactive and hang without a TTY
+const autoCmd = config.autoLoginCmd;
 if (autoCmd) {
   if (!tryAcquireAutoLoginLock()) {
     // Another session is already running auto-login — wait for it
@@ -49,6 +51,7 @@ if (autoCmd) {
           execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
             stdio: "ignore",
             timeout: 15_000,
+            shell: process.platform === "win32",
           });
           console.log("Credentials refreshed by another session. Retrying...");
           process.exit(0);
@@ -56,6 +59,7 @@ if (autoCmd) {
       }
       sleepSync(3000);
     }
+    console.log("Timed out waiting for the other session to complete re-authentication.");
   } else {
     console.log("AWS credentials expired. Running auto-login...");
     try {

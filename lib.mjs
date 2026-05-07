@@ -55,6 +55,11 @@ export function loadConfig() {
   if (process.env.CC_KEEPALIVE_PROFILE) {
     config.profile = process.env.CC_KEEPALIVE_PROFILE;
   }
+  // Validate profile name (prevent CLI flag injection via --profile)
+  if (config.profile && !/^[a-zA-Z0-9._-]+$/.test(config.profile)) {
+    process.stderr.write(`cc-aws-keepalive: invalid profile name "${config.profile}" (only alphanumeric, dots, hyphens, underscores allowed)\n`);
+    config.profile = "default";
+  }
   // Warn about ineffective auto-login config
   if (config.autoLoginMinutes > 0 && !config.expirationField) {
     process.stderr.write("cc-aws-keepalive: autoLoginMinutes requires expirationField to be set. Auto-login disabled.\n");
@@ -95,9 +100,16 @@ export function getRemaining(config) {
   if (!creds || !config.expirationField) return null;
 
   const raw = creds[config.expirationField];
-  if (!/^\d+$/.test(raw)) return null;
-  const exp = parseInt(raw, 10);
-  if (exp < 1_000_000_000) return null; // reject non-epoch values (before 2001-09-09)
+  let exp;
+  if (/^\d+$/.test(raw)) {
+    exp = parseInt(raw, 10);
+    if (exp < 1_000_000_000) return null;
+  } else {
+    const parsed = Date.parse(raw);
+    if (isNaN(parsed)) return null;
+    exp = Math.floor(parsed / 1000);
+    if (exp < 1_000_000_000) return null;
+  }
 
   return { remaining: exp - Math.floor(Date.now() / 1000), expiration: exp };
 }
@@ -134,7 +146,13 @@ export function releaseAutoLoginLock() {
   try { unlinkSync(LOCK_FILE); } catch { /* already gone */ }
 }
 
-const _sleepBuf = new Int32Array(new SharedArrayBuffer(4));
+let _sleepBuf;
+try { _sleepBuf = new Int32Array(new SharedArrayBuffer(4)); } catch { _sleepBuf = null; }
 export function sleepSync(ms) {
-  Atomics.wait(_sleepBuf, 0, 0, ms);
+  if (_sleepBuf) {
+    Atomics.wait(_sleepBuf, 0, 0, ms);
+  } else {
+    const end = Date.now() + ms;
+    while (Date.now() < end) { /* busy wait fallback */ }
+  }
 }
