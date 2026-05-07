@@ -42,11 +42,6 @@ describe("formatTime", () => {
     ({ formatTime } = await import("./lib.mjs"));
   });
 
-  afterEach(() => {
-    process.env.HOME = ORIGINAL_HOME;
-    process.env.USERPROFILE = ORIGINAL_USERPROFILE;
-  });
-
   it("returns EXPIRED for 0", () => {
     assert.equal(formatTime(0), "EXPIRED");
   });
@@ -441,7 +436,7 @@ describe("getRemaining", () => {
     assert.equal(result, null);
   });
 
-  it("returns null for ISO-8601 date string", async () => {
+  it("parses ISO-8601 date string as valid expiration", async () => {
     writeCredentials(
       tmpHome,
       [
@@ -458,7 +453,9 @@ describe("getRemaining", () => {
       profile: "default",
       expirationField: "x_expiration",
     });
-    assert.equal(result, null);
+    assert.ok(result !== null);
+    assert.ok(result.remaining < 0, "past ISO-8601 date should have negative remaining");
+    assert.equal(result.expiration, Math.floor(Date.parse("2026-04-24T12:00:00Z") / 1000));
   });
 
   it("returns null for sub-epoch value", async () => {
@@ -548,6 +545,51 @@ describe("getRemaining", () => {
     assert.ok(result.remaining < 0, `expected negative remaining, got ${result.remaining}`);
     assert.equal(result.expiration, pastEpoch);
   });
+
+  it("parses ISO-8601 expiration timestamp", async () => {
+    const futureDate = new Date(Date.now() + 3600_000).toISOString();
+    writeCredentials(
+      tmpHome,
+      [
+        "[default]",
+        "aws_access_key_id = KEY",
+        `x_expiration = ${futureDate}`,
+      ].join("\n")
+    );
+
+    const { getRemaining } = await import(
+      `./lib.mjs?gr=${Date.now()}${Math.random()}`
+    );
+    const result = getRemaining({
+      profile: "default",
+      expirationField: "x_expiration",
+    });
+    assert.ok(result !== null);
+    assert.ok(result.remaining > 3500 && result.remaining <= 3600);
+  });
+
+  it("returns null when expiration field exists in different profile only", async () => {
+    writeCredentials(
+      tmpHome,
+      [
+        "[other]",
+        "aws_access_key_id = KEY",
+        "x_expiration = 9999999999",
+        "",
+        "[default]",
+        "aws_access_key_id = KEY2",
+      ].join("\n")
+    );
+
+    const { getRemaining } = await import(
+      `./lib.mjs?gr=${Date.now()}${Math.random()}`
+    );
+    const result = getRemaining({
+      profile: "default",
+      expirationField: "x_expiration",
+    });
+    assert.equal(result, null);
+  });
 });
 
 // ============================================================================
@@ -622,6 +664,46 @@ describe("auto-login lock", () => {
       `./lib.mjs?lock=${Date.now()}${Math.random()}`
     );
     assert.doesNotThrow(() => releaseAutoLoginLock());
+  });
+
+  it("acquires lock when existing lock has future timestamp (clock skew)", async () => {
+    const { tryAcquireAutoLoginLock, releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    const stateDir = join(tmpHome, ".config", "cc-aws-keepalive");
+    mkdirSync(stateDir, { recursive: true });
+    const futureTime = Math.floor(Date.now() / 1000) + 9999;
+    writeFileSync(join(stateDir, ".auto-login.lock"), String(futureTime));
+
+    const acquired = tryAcquireAutoLoginLock();
+    assert.equal(acquired, true);
+    releaseAutoLoginLock();
+  });
+
+  it("acquires lock when existing lock contains non-numeric garbage", async () => {
+    const { tryAcquireAutoLoginLock, releaseAutoLoginLock } = await import(
+      `./lib.mjs?lock=${Date.now()}${Math.random()}`
+    );
+    const stateDir = join(tmpHome, ".config", "cc-aws-keepalive");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, ".auto-login.lock"), "corrupted-data");
+
+    const acquired = tryAcquireAutoLoginLock();
+    assert.equal(acquired, true);
+    releaseAutoLoginLock();
+  });
+
+  it("second acquire fails when first already holds lock (concurrent simulation)", async () => {
+    const mod1 = await import(`./lib.mjs?lock=${Date.now()}${Math.random()}`);
+    const mod2 = await import(`./lib.mjs?lock=${Date.now()}${Math.random()}`);
+
+    const first = mod1.tryAcquireAutoLoginLock();
+    assert.equal(first, true);
+
+    const second = mod2.tryAcquireAutoLoginLock();
+    assert.equal(second, false);
+
+    mod1.releaseAutoLoginLock();
   });
 });
 

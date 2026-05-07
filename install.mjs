@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cross-platform installer for cc-aws-keepalive
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, realpathSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -29,8 +29,11 @@ console.log("cc-aws-keepalive installer\n");
 
 // 1. Config
 if (!existsSync(configFile)) {
-  mkdirSync(configDir, { recursive: true });
+  mkdirSync(configDir, { recursive: true, mode: 0o700 });
   copyFileSync(join(__dirname, "config.example.json"), configFile);
+  if (process.platform !== "win32") {
+    chmodSync(configFile, 0o600);
+  }
   console.log(`Created: ${configFile}`);
   console.log("Edit it to set your AWS profile, expiration field, and login command.\n");
 } else {
@@ -40,8 +43,9 @@ if (!existsSync(configFile)) {
 // 2. Detect plugin vs manual install — true only when running from CC's plugin cache
 // Use realpathSync to handle macOS /var → /private/var symlink resolution
 const pluginCachePath = join(claudeConfigDir, "plugins", "cache");
+const normPath = (p) => process.platform === "win32" ? p.toLowerCase() : p;
 const isPlugin = existsSync(pluginCachePath)
-  ? realpathSync(scriptDir).startsWith(realpathSync(pluginCachePath))
+  ? normPath(realpathSync(scriptDir)).startsWith(normPath(realpathSync(pluginCachePath)))
   : false;
 
 // 3. Core settings (always needed)

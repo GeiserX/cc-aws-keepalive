@@ -28,6 +28,7 @@ jobs:
           done
 
       - name: Run unit tests
+        if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.node-version == 22) }}
         run: npm test
 
       - name: Run coverage
@@ -49,6 +50,18 @@ jobs:
             echo "Validating $f..."
             node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"
           done
+
+      - name: Verify version consistency
+        shell: bash
+        run: |
+          PKG_VER=$(node -p "require('./package.json').version")
+          MKT_VER=$(node -p "require('./.claude-plugin/marketplace.json').version")
+          PLUGIN_VER=$(node -p "require('./.claude-plugin/marketplace.json').plugins[0].version")
+          if [ "$PKG_VER" != "$MKT_VER" ] || [ "$PKG_VER" != "$PLUGIN_VER" ]; then
+            echo "::error::Version mismatch: package.json=$PKG_VER, marketplace=$MKT_VER, plugin=$PLUGIN_VER"
+            exit 1
+          fi
+          echo "Versions consistent: $PKG_VER"
 
       - name: Verify installer runs (manual mode)
         if: runner.os == 'Linux'

@@ -3,6 +3,10 @@
 // Used by Claude Code's awsCredentialExport to bypass in-memory SDK cache.
 import { loadConfig, parseCredentials } from "./lib.mjs";
 
+if (process.stdout.isTTY) {
+  process.stderr.write("WARNING: Writing credentials to terminal. This script is meant for awsCredentialExport only.\n");
+}
+
 const config = loadConfig();
 const creds = parseCredentials(config.profile);
 

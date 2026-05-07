@@ -19,6 +19,7 @@ if (info) {
     execFileSync("aws", ["sts", "get-caller-identity", "--profile", config.profile], {
       stdio: "ignore",
       timeout: 10_000,
+      shell: process.platform === "win32",
     });
     process.exit(0); // Valid, can't determine remaining time
   } catch {
