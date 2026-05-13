@@ -250,7 +250,7 @@ expect {
         }
         exp_continue
     }
-    -re {push notification|Okta Verify|Waiting.*approval|verify.*identity|Please Approve} {
+    -re {push notification|Waiting.*approval|verify.*identity|Please Approve} {
         # Simple push MFA (no number) — just remind to approve
         if {!$notified} {
             set notified 1
