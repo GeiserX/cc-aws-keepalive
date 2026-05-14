@@ -12,7 +12,9 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [18, 20, 22]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os:
+          - [self-hosted, Linux, X64]
+          - [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -28,15 +30,15 @@ jobs:
           done
 
       - name: Run unit tests
-        if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.node-version == 22) }}
+        if: ${{ !(contains(matrix.os, 'Linux') && matrix.node-version == 22) }}
         run: npm test
 
       - name: Run coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        if: contains(matrix.os, 'Linux') && matrix.node-version == 22
         run: npx c8 --reporter=lcov node --test
 
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        if: contains(matrix.os, 'Linux') && matrix.node-version == 22
         uses: codecov/codecov-action@v6
         with:
           files: coverage/lcov.info
@@ -64,7 +66,7 @@ jobs:
           echo "Versions consistent: $PKG_VER"
 
       - name: Verify installer runs (manual mode)
-        if: runner.os == 'Linux'
+        if: contains(matrix.os, 'Linux')
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -74,7 +76,7 @@ jobs:
           grep -q "credential refresh + proactive hook" output.txt
 
       - name: Verify OMC wrapper install and idempotency
-        if: runner.os == 'Linux'
+        if: contains(matrix.os, 'Linux')
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -100,7 +102,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify legacy patch cleanup
-        if: runner.os == 'Linux'
+        if: contains(matrix.os, 'Linux')
         shell: bash
         run: |
           export HOME=$(mktemp -d)
@@ -124,7 +126,7 @@ jobs:
           test -f "$HOME/.claude/hud/aws-hud-wrapper.mjs"
 
       - name: Verify plugin mode and settings update
-        if: runner.os == 'Linux'
+        if: contains(matrix.os, 'Linux')
         shell: bash
         run: |
           export HOME=$(mktemp -d)
