@@ -125,7 +125,7 @@ export function formatTime(seconds) {
   return m > 0 ? `${m}m` : "<1m";
 }
 
-const STATE_DIR = join(homedir(), ".config", "cc-aws-keepalive");
+export const STATE_DIR = join(homedir(), ".config", "cc-aws-keepalive");
 const LOCK_FILE = join(STATE_DIR, ".auto-login.lock");
 const LOCK_MAX_AGE_SEC = 300;
 

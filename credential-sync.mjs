@@ -3,9 +3,8 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { parseCredentials } from "./lib.mjs";
+import { parseCredentials, STATE_DIR } from "./lib.mjs";
 
-const STATE_DIR = join(homedir(), ".config", "cc-aws-keepalive");
 const SYNC_STATE_FILE = join(STATE_DIR, ".last-sync");
 const SAFE_PATH_RE = /^~?\/[a-zA-Z0-9_./-]+$/;
 const MAX_STDERR = 8192;
@@ -72,7 +71,8 @@ function syncSsh(target, ini, config) {
   }
 
   if (target.sshArgs) {
-    sshArgs.push(...target.sshArgs.split(/\s+/));
+    const extra = Array.isArray(target.sshArgs) ? target.sshArgs : target.sshArgs.split(/\s+/);
+    sshArgs.push(...extra);
   }
 
   if (target.user) sshArgs.push("-l", target.user);

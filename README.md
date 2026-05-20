@@ -406,7 +406,7 @@ Add a `syncTargets` array to your `~/.config/cc-aws-keepalive/config.json`:
 | Field | Description |
 |-------|-------------|
 | `syncTargets` | Array of sync targets (empty = disabled) |
-| `syncTimeoutSeconds` | Timeout per sync operation (default: 15) |
+| `syncTimeoutSeconds` | Timeout per sync operation in seconds (default: 15). Uses seconds (not minutes) because sync operations complete in seconds, unlike session lifetimes |
 | `syncCooldownSeconds` | Minimum seconds between syncs (default: 60) |
 
 ### Sync types
@@ -432,7 +432,7 @@ Copies credentials to a remote `~/.aws/credentials` file via SSH. Uses key-based
 | `user` | SSH username (optional — uses SSH config default) |
 | `remoteProfile` | Profile name on the remote file (default: same as local `profile`) |
 | `remotePath` | Remote credentials file path (default: `~/.aws/credentials`) |
-| `sshArgs` | Additional SSH arguments as a string (optional) |
+| `sshArgs` | Additional SSH arguments as a string or array (optional). Use array form for paths with spaces: `["-i", "/path/to/key"]` |
 | `sshPassword` | Password for `sshpass` auth (optional — prefer key-based auth) |
 
 The remote write is atomic (write to `.tmp` then `mv`). Credentials are piped via stdin — never in command arguments or environment variables.
@@ -508,6 +508,7 @@ Stdin JSON format:
 - **HTTPS enforced**: Webhook targets must use `https://`; also refuses if `NODE_TLS_REJECT_UNAUTHORIZED=0`
 - **Stdin transport**: Credentials are piped via stdin, never passed as CLI arguments or environment variables
 - **Atomic writes**: SSH sync writes to a `.tmp` file then atomically renames — no partial reads on the remote
+- **TOFU-aware**: SSH uses `StrictHostKeyChecking=accept-new` — host keys are trusted on first connection and verified on subsequent ones. For high-security environments, pre-populate `~/.ssh/known_hosts` or use `sshArgs` to specify a `UserKnownHostsFile`
 - **Fire-and-forget**: Sync runs in the background and never blocks your Claude Code session
 
 ## Limitations
