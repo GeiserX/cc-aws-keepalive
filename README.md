@@ -492,10 +492,13 @@ Stdin JSON format:
 ```json
 {
   "profile": "my-profile",
-  "aws_access_key_id": "...",
-  "aws_secret_access_key": "...",
-  "aws_session_token": "...",
-  "expiration": "2024-01-01T12:00:00Z"
+  "credentials": {
+    "aws_access_key_id": "...",
+    "aws_secret_access_key": "...",
+    "aws_session_token": "..."
+  },
+  "expiration": "2024-01-01T12:00:00Z",
+  "timestamp": 1716000000000
 }
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -7,12 +7,14 @@ import { parseCredentials } from "./lib.mjs";
 
 const STATE_DIR = join(homedir(), ".config", "cc-aws-keepalive");
 const SYNC_STATE_FILE = join(STATE_DIR, ".last-sync");
+const SAFE_PATH_RE = /^~?\/[a-zA-Z0-9_./-]+$/;
+const MAX_STDERR = 8192;
 
 function shouldSync(config) {
-  const cooldown = (config.syncCooldownSeconds || 60) * 1000;
+  const cooldown = (config.syncCooldownSeconds ?? 60) * 1000;
   try {
     const last = parseInt(readFileSync(SYNC_STATE_FILE, "utf8"), 10);
-    if (Date.now() - last < cooldown) return false;
+    if (!isNaN(last) && Date.now() - last < cooldown) return false;
   } catch { /* no state file — proceed */ }
   return true;
 }
@@ -38,16 +40,24 @@ function buildIniBlock(profile, creds, expirationField) {
 }
 
 function syncSsh(target, ini, config) {
-  const timeout = (config.syncTimeoutSeconds || 15) * 1000;
+  const timeout = (config.syncTimeoutSeconds ?? 15) * 1000;
   const remotePath = target.remotePath || "~/.aws/credentials";
+
+  if (!SAFE_PATH_RE.test(remotePath)) {
+    process.stderr.write(`cc-aws-keepalive: invalid remotePath "${remotePath}" — must be a simple file path\n`);
+    return;
+  }
+
   const remoteCmd = `mkdir -p ~/.aws && chmod 700 ~/.aws && cat > ${remotePath}.tmp && chmod 600 ${remotePath}.tmp && mv ${remotePath}.tmp ${remotePath}`;
 
   let sshBinary = "ssh";
   const sshArgs = [];
+  let spawnEnv;
 
   if (target.sshPassword) {
     sshBinary = "sshpass";
-    sshArgs.push("-p", target.sshPassword, "ssh");
+    sshArgs.push("-e", "ssh");
+    spawnEnv = { ...process.env, SSHPASS: target.sshPassword };
   }
 
   sshArgs.push(
@@ -71,30 +81,28 @@ function syncSsh(target, ini, config) {
   const child = spawn(sshBinary, sshArgs, {
     stdio: ["pipe", "ignore", "pipe"],
     timeout,
+    ...(spawnEnv && { env: spawnEnv }),
   });
 
   child.stdin.write(ini);
   child.stdin.end();
 
   let stderr = "";
-  child.stderr.on("data", (d) => { stderr += d.toString(); });
+  child.stderr.on("data", (d) => { if (stderr.length < MAX_STDERR) stderr += d.toString(); });
 
-  const timer = setTimeout(() => child.kill(), timeout);
   child.on("close", (code) => {
-    clearTimeout(timer);
     if (code !== 0) {
       process.stderr.write(`cc-aws-keepalive: sync to ${target.host} failed (exit ${code})${stderr ? ": " + stderr.trim() : ""}\n`);
     }
   });
   child.on("error", (err) => {
-    clearTimeout(timer);
     process.stderr.write(`cc-aws-keepalive: sync to ${target.host} error: ${err.message}\n`);
   });
   child.unref();
 }
 
 function syncWebhook(target, creds, config) {
-  const timeout = (config.syncTimeoutSeconds || 15) * 1000;
+  const timeout = (config.syncTimeoutSeconds ?? 15) * 1000;
   const url = new URL(target.url);
 
   if (url.protocol !== "https:") {
@@ -140,22 +148,25 @@ function syncWebhook(target, creds, config) {
     req.on("timeout", () => req.destroy());
     req.write(payload);
     req.end();
+    req.socket?.unref?.();
   });
 }
 
 function syncCommand(target, creds, config) {
-  const timeout = (config.syncTimeoutSeconds || 15) * 1000;
+  const timeout = (config.syncTimeoutSeconds ?? 15) * 1000;
   const payload = JSON.stringify({
     profile: target.remoteProfile || config.profile,
-    aws_access_key_id: creds.aws_access_key_id,
-    aws_secret_access_key: creds.aws_secret_access_key,
-    aws_session_token: creds.aws_session_token || "",
+    credentials: {
+      aws_access_key_id: creds.aws_access_key_id,
+      aws_secret_access_key: creds.aws_secret_access_key,
+      aws_session_token: creds.aws_session_token || "",
+    },
     expiration: config.expirationField ? (creds[config.expirationField] || "") : "",
+    timestamp: Date.now(),
   });
 
   const child = spawn(target.command, {
     shell: true,
-    detached: true,
     stdio: ["pipe", "ignore", "pipe"],
     timeout,
   });
@@ -164,7 +175,7 @@ function syncCommand(target, creds, config) {
   child.stdin.end();
 
   let stderr = "";
-  child.stderr.on("data", (d) => { stderr += d.toString(); });
+  child.stderr.on("data", (d) => { if (stderr.length < MAX_STDERR) stderr += d.toString(); });
 
   child.on("close", (code) => {
     if (code !== 0) {
