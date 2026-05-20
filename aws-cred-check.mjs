@@ -13,6 +13,11 @@ let remaining = null;
 const info = getRemaining(config);
 if (info) {
   remaining = info.remaining;
+  if (remaining > 0 && config.syncTargets?.length) {
+    import("./credential-sync.mjs").then(m => m.syncCredentials(config)).catch(e => {
+      process.stderr.write(`cc-aws-keepalive: sync failed: ${e.message}\n`);
+    });
+  }
 } else {
   // No expiration field, or field configured but unresolvable — fall back to STS
   try {
