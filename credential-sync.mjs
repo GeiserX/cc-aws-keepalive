@@ -103,7 +103,11 @@ function syncSsh(target, ini, config) {
 
 function syncWebhook(target, creds, config) {
   const timeout = (config.syncTimeoutSeconds ?? 15) * 1000;
-  const url = new URL(target.url);
+  let url;
+  try { url = new URL(target.url); } catch {
+    process.stderr.write(`cc-aws-keepalive: invalid webhook URL "${target.url}"\n`);
+    return;
+  }
 
   if (url.protocol !== "https:") {
     process.stderr.write(`cc-aws-keepalive: webhook sync REFUSED — ${target.url} must use https://\n`);

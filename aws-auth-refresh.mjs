@@ -67,11 +67,13 @@ if (autoCmd) {
       releaseAutoLoginLock();
       const refreshed = getRemaining(config);
       if (refreshed && refreshed.remaining > 0) {
-        import("./credential-sync.mjs").then(m => m.syncCredentials(config)).catch(() => {});
+        import("./credential-sync.mjs").then(m => m.syncCredentials(config)).catch(e => {
+          process.stderr.write(`cc-aws-keepalive: sync failed: ${e.message}\n`);
+        });
         console.log(
           `Auto-login succeeded (valid for ${formatTime(refreshed.remaining)}). Retrying...`
         );
-        process.exit(0);
+        setTimeout(() => process.exit(0), 500);
       }
     } catch {
       releaseAutoLoginLock();
