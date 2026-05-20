@@ -6,5 +6,8 @@
   "autoLoginMinutes": 0,
   "warnMinutes": 30,
   "timerWarnMinutes": 60,
-  "statusLineCmd": ""
+  "statusLineCmd": "",
+  "syncTargets": [],
+  "syncTimeoutSeconds": 15,
+  "syncCooldownSeconds": 60
 }

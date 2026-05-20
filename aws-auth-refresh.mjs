@@ -67,6 +67,7 @@ if (autoCmd) {
       releaseAutoLoginLock();
       const refreshed = getRemaining(config);
       if (refreshed && refreshed.remaining > 0) {
+        import("./credential-sync.mjs").then(m => m.syncCredentials(config)).catch(() => {});
         console.log(
           `Auto-login succeeded (valid for ${formatTime(refreshed.remaining)}). Retrying...`
         );

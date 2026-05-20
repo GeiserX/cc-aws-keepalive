@@ -18,6 +18,9 @@ const DEFAULTS = {
   warnMinutes: 30,
   timerWarnMinutes: 60,
   statusLineCmd: "",
+  syncTargets: [],
+  syncTimeoutSeconds: 15,
+  syncCooldownSeconds: 60,
 };
 
 export function loadConfig() {
