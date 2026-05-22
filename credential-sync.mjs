@@ -84,6 +84,7 @@ function syncSsh(target, ini, config) {
     ...(spawnEnv && { env: spawnEnv }),
   });
 
+  child.stdin.on("error", () => {});
   child.stdin.write(ini);
   child.stdin.end();
 
@@ -175,6 +176,7 @@ function syncCommand(target, creds, config) {
     timeout,
   });
 
+  child.stdin.on("error", () => {});
   child.stdin.write(payload);
   child.stdin.end();
 
