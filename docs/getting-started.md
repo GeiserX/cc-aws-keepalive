@@ -1,4 +1,4 @@
-# Installation
+# Getting started
 
 Requires Node.js (ships with Claude Code).
 
