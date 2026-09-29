@@ -11,7 +11,7 @@
 
 # cc-aws-keepalive
 
-Keep Claude Code sessions alive through AWS credential expiration: four small Node.js scripts, run by Claude Code as hook commands, make it re-read `~/.aws/credentials` instead of making you restart the tab when your SSO or SAML session expires.
+Keep Claude Code sessions alive through AWS credential expiration: four small Node.js command-line scripts, wired into Claude Code's credential, hook and status line settings, make it re-read `~/.aws/credentials` instead of making you restart the tab when your SSO or SAML session expires.
 
 With AWS Bedrock, Claude Code's AWS SDK caches credentials in memory and never re-reads `~/.aws/credentials` after they expire ([known issue](https://github.com/anthropics/claude-code/issues/41064)).
 
