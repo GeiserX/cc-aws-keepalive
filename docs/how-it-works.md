@@ -15,23 +15,7 @@ Four Node.js scripts (cross-platform: macOS, Linux, Windows) that hook into Clau
 | `aws-cred-check.mjs` | Proactive check before each prompt — warns if expired or nearing expiry | `hooks.UserPromptSubmit` |
 | `aws-statusline.mjs` | Optional persistent timer in the status bar (e.g., `AWS: 4h23m`) | `statusLine` |
 
-### How it works
-
-**Before expiry (proactive):**
-
-1. You submit a prompt in Claude Code
-2. The `UserPromptSubmit` hook checks credential expiration
-3. If nearing expiry and `autoLoginCmd` is configured: fires it in the background (you get a notification, approve MFA, session renews silently)
-4. If nearing expiry without `autoLoginCmd`: inline warning with re-auth command
-5. If expired: warns inline — the prompt proceeds and `awsAuthRefresh` handles recovery
-
-**After expiry (reactive):**
-
-1. Claude Code hits a Bedrock 403
-2. `awsAuthRefresh` runs — checks if you already re-authed in another terminal
-3. If still expired and `autoLoginCmd` is configured, runs it synchronously (waits up to 3 minutes for password + MFA)
-4. `awsCredentialExport` reads fresh creds from disk (bypassing SDK memory cache)
-5. Claude Code retries the API call — session continues without restart
+What each script does as a session runs, before and after the credentials expire, is in [Usage](usage.md).
 
 ### The key insight
 
