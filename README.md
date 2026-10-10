@@ -11,9 +11,9 @@
 
 # cc-aws-keepalive
 
-Keep Claude Code sessions alive through AWS credential expiration: four small Node.js command-line scripts, wired into Claude Code's credential, hook and status line settings, make it re-read `~/.aws/credentials` instead of making you restart the tab when your SSO or SAML session expires.
+Keep Claude Code sessions alive through AWS credential expiration: four small Node.js command-line scripts, wired into Claude Code's credential, hook and status line settings, warn you before your SSO or SAML session runs out, read fresh credentials from `~/.aws/credentials`, and can log you back in on their own.
 
-With AWS Bedrock, Claude Code's AWS SDK caches credentials in memory and never re-reads `~/.aws/credentials` after they expire ([known issue](https://github.com/anthropics/claude-code/issues/41064)).
+On AWS Bedrock, Claude Code used to keep expired credentials in memory, and a session hung until you restarted the tab ([issue 41064](https://github.com/anthropics/claude-code/issues/41064), closed as stale in May 2026). Since v2.1.207, [Claude Code's Bedrock docs](https://code.claude.com/docs/en/amazon-bedrock#credential-caching-and-resolution-timeout) say it drops its cached credentials after a credential error and resolves them again. cc-aws-keepalive adds what Claude Code doesn't do: a warning before the session expires, a countdown, an automatic re-login, and an `awsAuthRefresh` that notices you already logged in from another terminal.
 
 ## Features
 
@@ -41,7 +41,7 @@ Needs Node 18 or newer and a `~/.aws/credentials` file. The installer creates a 
 - [Getting started](docs/getting-started.md): plugin or manual install, upgrading, requirements, platform notes
 - [Configuration](docs/configuration.md): `config.json` fields, `CC_KEEPALIVE_PROFILE`, credential providers, limitations
 - [Usage](docs/usage.md): the warnings before each prompt, the recovery after a Bedrock 403, the status line timer
-- [How it works](docs/how-it-works.md): the problem, the four scripts, and why re-reading from disk fixes it
+- [How it works](docs/how-it-works.md): the problem, the four scripts, and why they read from disk
 - [Auto-login setup](docs/auto-login.md): keychain storage, an `expect` template, common pitfalls, Windows
 - [Credential sync](docs/credential-sync.md): SSH, webhook and command targets, and their security properties
 

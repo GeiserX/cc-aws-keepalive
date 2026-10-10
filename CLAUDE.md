@@ -7,7 +7,7 @@ Claude Code plugin that keeps Bedrock sessions alive through AWS credential expi
 - **`lib.mjs`** — Shared config loader and credential parser. All scripts import from here.
 - **`aws-cred-export.mjs`** — Reads fresh creds from `~/.aws/credentials`, bypassing SDK in-memory cache. Used by CC's `awsCredentialExport`.
 - **`aws-auth-refresh.mjs`** — Checks if creds were already refreshed in another terminal. Used by CC's `awsAuthRefresh`.
-- **`aws-cred-check.mjs`** — `UserPromptSubmit` hook. Warns via stderr if expired or nearing expiry (never blocks — blocked prompts are discarded by CC).
+- **`aws-cred-check.mjs`** — `UserPromptSubmit` hook. Warns through a JSON `systemMessage` on stdout if expired or nearing expiry (stderr from a hook that exits 0 is never shown; never blocks — blocked prompts are discarded by CC). Without `expirationField` it caches the STS answer for 5 minutes in `~/.config/cc-aws-keepalive/.sts-check-<profile>.json`, invalidated when `~/.aws/credentials` changes.
 - **`aws-statusline.mjs`** — Optional statusline timer with ANSI color.
 - **`install.mjs`** — Cross-platform installer. Detects OMC and other plugins.
 
@@ -21,7 +21,7 @@ The `hooks/hooks.json` auto-registers the `UserPromptSubmit` hook when installed
 
 ## Cross-Platform
 
-All scripts are Node.js (`.mjs`). No bash, no platform-specific code. Uses `node:fs`, `node:os`, `node:path`, and `node:child_process` (`execFileSync` for STS fallback and status line composition). The `osascript` call was removed — warnings go to stderr.
+All scripts are Node.js (`.mjs`). No bash, no platform-specific code. Uses `node:fs`, `node:os`, `node:path`, and `node:child_process` (`execFileSync` for STS fallback and status line composition). The `osascript` call was removed — warnings go to the hook's `systemMessage`.
 
 ## Testing
 

@@ -18,7 +18,7 @@ Edit `~/.config/cc-aws-keepalive/config.json`:
 | Field | Description |
 |-------|-------------|
 | `profile` | AWS profile name in `~/.aws/credentials` |
-| `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity` (slower, can only detect expired vs. valid — not time remaining) |
+| `expirationField` | Field storing session expiration as unix timestamp. Leave empty to fall back to `aws sts get-caller-identity`, which can only detect expired vs. valid, not time remaining. The prompt hook reuses its answer for 5 minutes, or until `~/.aws/credentials` changes, so it costs one network call per 5 minutes rather than one per prompt |
 | `loginCmd` | Command to re-authenticate (shown in warnings so you can copy-paste it) |
 | `autoLoginCmd` | Command for fully automated re-authentication. Must work without a TTY — see [Auto-login setup](auto-login.md) |
 | `autoLoginMinutes` | Auto-run `autoLoginCmd` when session has fewer than this many minutes left (0 = disabled). Requires `expirationField`. Rate-limited to once per 5 minutes |
@@ -61,5 +61,5 @@ What the optional timer shows, and how it combines with other status line plugin
 
 ## Limitations
 
-- **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes".
+- **Proactive time-remaining warnings** require `expirationField`. Without it, the STS fallback can only detect valid vs. expired — not "expires in 20 minutes" — and because its answer is reused for 5 minutes, it can notice an expiry up to 5 minutes late.
 - **Fully automated re-authentication** requires an `autoLoginCmd` that can drive your login tool non-interactively. See [Auto-login setup](auto-login.md) for a complete walkthrough.
