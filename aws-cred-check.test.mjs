@@ -80,7 +80,7 @@ describe("aws-cred-check.mjs warnings (expirationField set)", () => {
   });
 
   it("warns in a systemMessage when the session is close to expiry", () => {
-    setup(10 * 60);
+    setup(10 * 60 + 30); // 30 s margin so a slow runner still reads 10m
     assert.match(systemMessage(runCheck(home)), /AWS session expires in 10m\. Run soon: saml2aws login/);
   });
 
@@ -92,7 +92,7 @@ describe("aws-cred-check.mjs warnings (expirationField set)", () => {
   });
 
   it("joins the auto-login notice and the warning into one JSON object", () => {
-    setup(10 * 60, { autoLoginCmd: "true", autoLoginMinutes: 30 });
+    setup(10 * 60 + 30, { autoLoginCmd: "true", autoLoginMinutes: 30 });
     const msg = systemMessage(runCheck(home));
     assert.match(msg, /^AWS auto-login started in background \(10m remaining\)\.\nAWS session expires in 10m/);
   });
