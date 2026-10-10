@@ -7,8 +7,17 @@ Once installed, cc-aws-keepalive runs on its own inside Claude Code. This is wha
 1. You submit a prompt in Claude Code
 2. The `UserPromptSubmit` hook checks credential expiration
 3. If nearing expiry and `autoLoginCmd` is configured: fires it in the background (you get a notification, approve MFA, session renews silently)
-4. If nearing expiry without `autoLoginCmd`: inline warning with re-auth command
-5. If expired: warns inline — the prompt proceeds and `awsAuthRefresh` handles recovery
+4. If nearing expiry without `autoLoginCmd`: a warning with the re-auth command appears under your prompt
+5. If expired: the same kind of warning — the prompt proceeds and `awsAuthRefresh` handles recovery
+
+The warning appears as a line under your prompt, for example:
+
+```
+❯ fix the failing test
+  ⎿  UserPromptSubmit says: ⚠ AWS credentials EXPIRED. Run: saml2aws login --profile my-bedrock-profile in another terminal — CC will auto-retry via awsAuthRefresh.
+```
+
+The hook prints it as a `systemMessage` in its JSON output, which Claude Code shows to you. Without `expirationField`, the check asks `aws sts get-caller-identity` at most once every 5 minutes (sooner when `~/.aws/credentials` changes), so it doesn't slow every prompt down.
 
 ## After they expire
 

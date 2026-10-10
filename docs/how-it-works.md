@@ -2,7 +2,7 @@
 
 ## Problem
 
-When using Claude Code with AWS Bedrock, the AWS SDK caches credentials in memory. After your SSO/SAML session expires (typically every 1-12 hours), all Claude Code sessions become unresponsive and must be restarted — often corrupting conversations and losing context.
+When using Claude Code with AWS Bedrock, Claude Code caches credentials in memory, and your SSO/SAML session expires (typically every 1-12 hours). Claude Code used to keep the expired credentials, so every session became unresponsive and had to be restarted, often losing context ([issue 41064](https://github.com/anthropics/claude-code/issues/41064), closed as stale in May 2026). Since v2.1.207, [Claude Code's Bedrock docs](https://code.claude.com/docs/en/amazon-bedrock#credential-caching-and-resolution-timeout) say a credential error clears that cache and the retry resolves fresh credentials. You still find out only when a request fails, and you still have to log in again yourself.
 
 ## Solution
 
@@ -19,4 +19,4 @@ What each script does as a session runs, before and after the credentials expire
 
 ### The key insight
 
-Claude Code's AWS SDK caches credentials in memory and doesn't re-read `~/.aws/credentials` after expiry ([known issue](https://github.com/anthropics/claude-code/issues/41064)). The `awsCredentialExport` setting forces Claude Code to call our script instead, which always reads the latest credentials from disk.
+Claude Code caches the credentials it resolves in memory. The `awsCredentialExport` setting makes Claude Code call our script at session start and on each credential reload instead, and the script always reads the latest credentials from disk, so the next reload picks up a login done in any terminal.
