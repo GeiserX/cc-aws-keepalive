@@ -1,6 +1,6 @@
 # Getting started
 
-Requires Node.js (ships with Claude Code).
+Requires Node.js 18 or newer on your `PATH`. The native Claude Code install doesn't include Node.js, so install it separately if `node --version` fails.
 
 ## Option A: As a Claude Code plugin (recommended)
 
@@ -56,7 +56,7 @@ The installer automatically:
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with `CLAUDE_CODE_USE_BEDROCK=1`
-- Node.js (ships with Claude Code)
+- Node.js 18 or newer on your `PATH` (the native Claude Code install doesn't include it)
 - Any AWS credential provider that writes to `~/.aws/credentials`
 
 ## Platform notes
